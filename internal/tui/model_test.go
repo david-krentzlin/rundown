@@ -439,6 +439,56 @@ func TestManualScrollUpDisablesTailFollow(t *testing.T) {
 	}
 }
 
+func TestQuitStopsRunningExecution(t *testing.T) {
+	doc := ParseMarkdown("# A\n")
+	m := NewModel(doc, "test.md")
+
+	canceled := false
+	m.execRunning = true
+	m.execCancel = func() { canceled = true }
+
+	quit, _, handled := m.handleGlobalKey("ctrl+q")
+	if !handled {
+		t.Fatal("expected ctrl+q to be handled")
+	}
+	if !quit {
+		t.Fatal("expected ctrl+q to request quit")
+	}
+	if !canceled {
+		t.Fatal("expected running execution to be canceled before quit")
+	}
+}
+
+func TestCannotStartExecutionWhileAnotherRunIsActive(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.SetViewport(80, 20)
+
+	execIdx := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind == NodeExec {
+			execIdx = i
+			break
+		}
+	}
+	if execIdx < 0 {
+		t.Fatal("expected executable block in outline")
+	}
+
+	m.outlineIdx = execIdx
+	m.execRunning = true
+	before := len(m.execHistory[m.doc.Outline[execIdx].ID])
+
+	cmd := m.handleOutlineKey("r")
+	if cmd != nil {
+		t.Fatal("expected nil cmd when execution is already running")
+	}
+	after := len(m.execHistory[m.doc.Outline[execIdx].ID])
+	if after != before {
+		t.Fatalf("execution history changed while already running: before=%d after=%d", before, after)
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0

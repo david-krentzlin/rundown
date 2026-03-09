@@ -192,6 +192,7 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
+		m.stopExecution()
 		return true, nil, true
 	case "ctrl+a":
 		m.gotoDocumentTop()
