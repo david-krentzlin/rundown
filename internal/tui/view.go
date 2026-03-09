@@ -54,7 +54,7 @@ func (m *Model) renderMain() string {
 }
 
 func (m *Model) renderFooter() string {
-	text := "tab pane | quit: C-c C-q Q | markdown: hjkl HJKL | outline: j/k c/C e/E x n p r s(stop)"
+	text := "tab pane | v hide/show panel | [/] prev/next run | PgUp/PgDn scroll log | outline: r run s stop"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("248")).
 		Background(lipgloss.Color("236")).
@@ -67,11 +67,20 @@ func (m *Model) renderLogPanel(height int) string {
 	bodyW := max(8, m.width-4)
 	bodyH := max(1, height-2)
 
-	header := fmt.Sprintf("exec: %s | status: %s", m.execTitle, m.execStatus)
-	if m.execRunning {
-		header = fmt.Sprintf("exec: %s | status: running | elapsed: %s", m.execTitle, time.Since(m.execStartedAt).Truncate(time.Second))
+	title, logs, status, current, total := m.execPanelData()
+	header := fmt.Sprintf("%s | status: %s", title, status)
+	if total > 0 {
+		header = fmt.Sprintf("%s | run %d/%d | status: %s", title, current, total, status)
 	}
-	lines := append([]string{header, strings.Repeat("─", max(1, bodyW))}, m.tailExecLogs(max(0, bodyH-2))...)
+	if m.execRunning {
+		header = fmt.Sprintf("%s | run %d/%d | status: running | elapsed: %s", title, current, total, time.Since(m.execStartedAt).Truncate(time.Second))
+	}
+	visible := max(0, bodyH-2)
+	maxScroll := max(0, len(logs)-visible)
+	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
+	start := m.execLogScroll
+	end := min(len(logs), start+visible)
+	lines := append([]string{header, strings.Repeat("─", max(1, bodyW))}, logs[start:end]...)
 	for len(lines) < bodyH {
 		lines = append(lines, "")
 	}
@@ -89,7 +98,6 @@ func (m *Model) renderLogPanel(height int) string {
 
 	return lipgloss.NewStyle().
 		Width(m.width).
-		Height(height).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 1).
@@ -125,7 +133,6 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 	}
 	return lipgloss.NewStyle().
 		Width(width).
-		Height(height).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 1).
@@ -293,7 +300,6 @@ func (m *Model) renderOutlinePane(width, height int) string {
 	}
 	return lipgloss.NewStyle().
 		Width(width).
-		Height(height).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 1).
@@ -337,7 +343,13 @@ func (m *Model) renderOutlineItem(idx int, item OutlineItem) string {
 	}
 
 	if item.Kind == NodeExec {
-		line := fmt.Sprintf("%s %s %s", cursorStyle.Render(cursor), iconForLang(item.Lang), item.Title)
+		count := m.execCount(idx)
+		runBadge := ""
+		if count > 0 {
+			runBadge = fmt.Sprintf(" [%d]", count)
+		}
+		summary := m.execSummary(idx)
+		line := fmt.Sprintf("%s %s %s%s%s", cursorStyle.Render(cursor), iconForLang(item.Lang), item.Title, runBadge, summary)
 		if idx == m.outlineIdx {
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Render(line)
 		}
@@ -389,6 +401,21 @@ func iconForLang(lang string) string {
 	default:
 		return "▶"
 	}
+}
+
+func (m *Model) execSummary(idx int) string {
+	h := m.execHistory[idx]
+	if len(h) == 0 {
+		return ""
+	}
+	last := h[len(h)-1]
+	if m.execRunning && m.execRunOutlineIdx == idx {
+		return " {running}"
+	}
+	if last.Duration > 0 {
+		return fmt.Sprintf(" {%s, %s}", last.Status, last.Duration.Truncate(time.Millisecond))
+	}
+	return fmt.Sprintf(" {%s}", last.Status)
 }
 
 func fitRightPad(s string, width int) string {

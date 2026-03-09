@@ -17,6 +17,17 @@ type execLineMsg struct {
 	line string
 }
 
+type ExecRecord struct {
+	Title    string
+	Lang     string
+	Command  string
+	Started  time.Time
+	Duration time.Duration
+	Status   string
+	ExitCode int
+	Logs     []string
+}
+
 type execDoneMsg struct {
 	err      error
 	exitCode int
@@ -59,6 +70,20 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 	m.execLogs = []string{fmt.Sprintf("$ %s %s", name, strings.Join(args, " "))}
 	m.execStatus = "running"
 	m.execMsgCh = make(chan tea.Msg, 1024)
+	m.execRunOutlineIdx = m.outlineIdx
+
+	record := ExecRecord{
+		Title:   item.Title,
+		Lang:    item.Lang,
+		Command: fmt.Sprintf("%s %s", name, strings.Join(args, " ")),
+		Started: m.execStartedAt,
+		Status:  "running",
+		Logs:    append([]string{}, m.execLogs...),
+	}
+	m.execHistory[m.execRunOutlineIdx] = append(m.execHistory[m.execRunOutlineIdx], record)
+	m.execViewIndex[m.execRunOutlineIdx] = len(m.execHistory[m.execRunOutlineIdx]) - 1
+	m.execViewOutline = m.execRunOutlineIdx
+	m.execLogScroll = 0
 
 	go streamExecPipe(stdout, m.execMsgCh)
 	go streamExecPipe(stderr, m.execMsgCh)

@@ -234,3 +234,22 @@ func TestEnableGlamourMessageTurnsOnMarkdownRenderer(t *testing.T) {
 		t.Fatal("expected glamour to be enabled after async message")
 	}
 }
+
+func TestLogPanelHeightFitsViewport(t *testing.T) {
+	doc := ParseMarkdown("# A\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(80, 14)
+
+	main := m.mainHeight()
+	panel := m.logPanelHeight()
+	if main < 3 {
+		t.Fatalf("main height = %d, want >= 3", main)
+	}
+	if panel < 3 {
+		t.Fatalf("panel height = %d, want >= 3", panel)
+	}
+	if main+panel > m.height-2 {
+		t.Fatalf("layout overflow: main(%d)+panel(%d) > available(%d)", main, panel, m.height-2)
+	}
+}

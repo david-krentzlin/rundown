@@ -37,23 +37,32 @@ type Model struct {
 	mdCacheLineCount int
 	mdCacheLines     []string
 
-	execPanelVisible bool
-	execRunning      bool
-	execStatus       string
-	execTitle        string
-	execLogs         []string
-	execStartedAt    time.Time
-	execCancel       context.CancelFunc
-	execMsgCh        chan tea.Msg
+	execPanelVisible  bool
+	execRunning       bool
+	execStatus        string
+	execTitle         string
+	execLogs          []string
+	execStartedAt     time.Time
+	execCancel        context.CancelFunc
+	execMsgCh         chan tea.Msg
+	execRunOutlineIdx int
+
+	execHistory     map[int][]ExecRecord
+	execViewIndex   map[int]int
+	execViewOutline int
+	execLogScroll   int
 }
 
 func NewModel(doc Document, fileName string) *Model {
 	return &Model{
-		doc:        doc,
-		fileName:   fileName,
-		focus:      PaneMarkdown,
-		collapsed:  map[int]bool{},
-		useGlamour: false,
+		doc:             doc,
+		fileName:        fileName,
+		focus:           PaneMarkdown,
+		collapsed:       map[int]bool{},
+		useGlamour:      false,
+		execHistory:     map[int][]ExecRecord{},
+		execViewIndex:   map[int]int{},
+		execViewOutline: -1,
 	}
 }
 
@@ -68,10 +77,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.SetViewport(x.Width, x.Height)
 		return m, nil
-	case enableGlamourMsg:
-		m.useGlamour = true
-		m.invalidateMarkdownCache()
-		return m, nil
 	case tea.KeyMsg:
 		if _, isRelease := x.(tea.KeyReleaseMsg); isRelease {
 			return m, nil
@@ -84,15 +89,36 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		m.handleMouseWheel(x)
 		return m, nil
+	}
+
+	if cmd, handled := m.handleInternalMsg(msg); handled {
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
+	switch x := msg.(type) {
+	case enableGlamourMsg:
+		m.useGlamour = true
+		m.invalidateMarkdownCache()
+		return nil, true
 	case execLineMsg:
 		m.execLogs = append(m.execLogs, x.line)
 		if len(m.execLogs) > 2000 {
 			m.execLogs = m.execLogs[len(m.execLogs)-2000:]
 		}
-		if m.execRunning && m.execMsgCh != nil {
-			return m, waitExecEvent(m.execMsgCh)
+		h := m.execHistory[m.execRunOutlineIdx]
+		if len(h) > 0 {
+			last := &h[len(h)-1]
+			last.Logs = append(last.Logs, x.line)
+			m.execHistory[m.execRunOutlineIdx] = h
 		}
-		return m, nil
+		if m.execRunning && m.execMsgCh != nil {
+			return waitExecEvent(m.execMsgCh), true
+		}
+		return nil, true
 	case execDoneMsg:
 		m.execRunning = false
 		switch {
@@ -104,12 +130,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.execStatus = fmt.Sprintf("completed (%d)", x.exitCode)
 		}
 		m.execLogs = append(m.execLogs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
-		return m, nil
+		h := m.execHistory[m.execRunOutlineIdx]
+		if len(h) > 0 {
+			last := &h[len(h)-1]
+			last.Duration = x.duration
+			last.ExitCode = x.exitCode
+			last.Logs = append(last.Logs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
+			last.Status = m.execStatus
+			m.execHistory[m.execRunOutlineIdx] = h
+		}
+		return nil, true
 	case execChannelClosedMsg:
-		return m, nil
+		return nil, true
+	default:
+		return nil, false
 	}
-
-	return m, nil
 }
 
 type enableGlamourMsg struct{}
@@ -142,6 +177,33 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 	case "ctrl+x":
 		m.stopExecution()
 		return false, nil
+	case "r":
+		return false, m.runExecutableAtSelection()
+	case "s":
+		m.stopExecution()
+		return false, nil
+	case "v":
+		m.toggleExecPanel()
+		return false, nil
+	case "[":
+		m.execPrevRecord()
+		return false, nil
+	case "]":
+		m.execNextRecord()
+		return false, nil
+	case "pgup", "ctrl+u":
+		m.execScroll(-5)
+		return false, nil
+	case "pgdown", "ctrl+d":
+		m.execScroll(5)
+		return false, nil
+	case "home":
+		m.execLogScroll = 0
+		return false, nil
+	case "end":
+		m.execLogScroll = 1 << 30
+		m.execScroll(0)
+		return false, nil
 	case "tab", "ctrl+i":
 		if m.focus == PaneMarkdown {
 			m.focus = PaneOutline
@@ -158,6 +220,30 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 		cmd := m.handleOutlineKey(key)
 		return false, cmd
 	}
+}
+
+func (m *Model) runExecutableAtSelection() tea.Cmd {
+	if m.execRunning {
+		return nil
+	}
+	if m.validOutlineIndex(m.outlineIdx) && m.doc.Outline[m.outlineIdx].Kind == NodeExec {
+		return m.runSelectedExecutable()
+	}
+	// If selection is on a heading, pick the first executable in that section.
+	start, end, ok := m.selectedLineRange()
+	if !ok {
+		return nil
+	}
+	for i, item := range m.doc.Outline {
+		if item.Kind != NodeExec {
+			continue
+		}
+		if item.Line >= start && item.Line <= end {
+			m.outlineIdx = i
+			return m.runSelectedExecutable()
+		}
+	}
+	return nil
 }
 
 func (m *Model) handleMarkdownKey(key string) {
@@ -199,7 +285,7 @@ func (m *Model) handleOutlineKey(key string) tea.Cmd {
 	case "p":
 		m.jumpExec(-1)
 	case "r":
-		return m.runSelectedExecutable()
+		return m.runExecutableAtSelection()
 	case "s":
 		m.stopExecution()
 	}
@@ -209,6 +295,15 @@ func (m *Model) handleOutlineKey(key string) tea.Cmd {
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) {
 	mouse := msg.Mouse()
+	if m.execPanelVisible && m.isInLogPanel(mouse.Y) {
+		switch mouse.Button {
+		case tea.MouseWheelUp:
+			m.execScroll(-3)
+		case tea.MouseWheelDown:
+			m.execScroll(3)
+		}
+		return
+	}
 	if !m.isInMarkdownPane(mouse.X, mouse.Y) {
 		return
 	}
@@ -503,15 +598,24 @@ func (m *Model) ensureBounds() {
 }
 
 func (m *Model) mainHeight() int {
-	h := m.height - 2
-	if m.execPanelVisible {
-		h -= m.logPanelHeight()
+	available := max(3, m.height-2) // header + footer
+	if !m.execPanelVisible {
+		return available
 	}
-	return max(3, h)
+	panel := m.logPanelHeight()
+	main := available - panel
+	return max(3, main)
 }
 
 func (m *Model) logPanelHeight() int {
-	return 8
+	if !m.execPanelVisible {
+		return 0
+	}
+	available := max(3, m.height-2) // header + footer
+	const desired = 16
+	// Keep at least 3 lines for main pane.
+	maxPanel := max(3, available-3)
+	return min(desired, maxPanel)
 }
 
 func (m *Model) leftPaneWidth() int {
@@ -528,6 +632,15 @@ func (m *Model) isInMarkdownPane(x, y int) bool {
 		return false
 	}
 	return x >= 0 && x < m.leftPaneWidth()
+}
+
+func (m *Model) isInLogPanel(y int) bool {
+	if !m.execPanelVisible {
+		return false
+	}
+	start := 1 + m.mainHeight()
+	end := start + m.logPanelHeight() - 1
+	return y >= start && y <= end
 }
 
 func (m *Model) selectedLineRange() (int, int, bool) {
