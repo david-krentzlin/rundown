@@ -66,42 +66,48 @@ func (m *Model) renderFooter() string {
 }
 
 func (m *Model) renderHelpOverlay() string {
-	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Render("rundown help")
+	panelFg := lipgloss.Color("252")
+	border := lipgloss.Color("110")
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("229")).Background(lipgloss.Color("31")).Padding(0, 1)
+	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("222"))
+	bodyStyle := lipgloss.NewStyle().Foreground(panelFg)
+	noteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("151")).Italic(true)
+
 	lines := []string{
-		title,
+		titleStyle.Render("rundown help"),
 		"",
-		"Global",
-		"  ?        toggle this help",
-		"  tab      switch pane focus",
-		"  Ctrl+A   jump to document top",
-		"  Ctrl+E   jump to document bottom",
-		"  Ctrl+C/Q quit (stops running commands)",
+		sectionStyle.Render("Global"),
+		bodyStyle.Render("  ?        toggle this help"),
+		bodyStyle.Render("  tab      switch pane focus"),
+		bodyStyle.Render("  Ctrl+A   jump to document top"),
+		bodyStyle.Render("  Ctrl+E   jump to document bottom"),
+		bodyStyle.Render("  Ctrl+C/Q quit (stops running commands)"),
 		"",
-		"Markdown pane",
-		"  j/k      move cursor down/up",
-		"  h/l      fallback left/right navigation",
-		"  J/K      next/previous heading",
-		"  H/L      parent/first child heading",
-		"  mouse    wheel scroll (left pane)",
+		sectionStyle.Render("Markdown pane"),
+		bodyStyle.Render("  j/k      move cursor down/up"),
+		bodyStyle.Render("  h/l      fallback left/right navigation"),
+		bodyStyle.Render("  J/K      next/previous heading"),
+		bodyStyle.Render("  H/L      parent/first child heading"),
+		bodyStyle.Render("  mouse    wheel scroll (left pane)"),
 		"",
-		"Outline pane",
-		"  j/k      move selection",
-		"  c/C      collapse current/all headings",
-		"  e/E      expand current/all headings",
-		"  x        toggle executable-only view",
-		"  n/p      next/previous executable",
-		"  r        run selected executable",
-		"  s        stop running command",
+		sectionStyle.Render("Outline pane"),
+		bodyStyle.Render("  j/k      move selection"),
+		bodyStyle.Render("  c/C      collapse current/all headings"),
+		bodyStyle.Render("  e/E      expand current/all headings"),
+		bodyStyle.Render("  x        toggle executable-only view"),
+		bodyStyle.Render("  n/p      next/previous executable"),
+		bodyStyle.Render("  r        run selected executable"),
+		bodyStyle.Render("  s        stop running command"),
 		"",
-		"Execution panel",
-		"  v        show/hide panel",
-		"  [/ ]     previous/next run for selected block",
-		"  PgUp/Dn  scroll logs",
-		"  Ctrl+U/D scroll logs",
-		"  Home/End jump to top/bottom logs",
-		"  mouse    wheel scroll (over log panel)",
+		sectionStyle.Render("Execution panel"),
+		bodyStyle.Render("  v        show/hide panel"),
+		bodyStyle.Render("  [/]      previous/next run for selected block"),
+		bodyStyle.Render("  PgUp/Dn  scroll logs"),
+		bodyStyle.Render("  Ctrl+U/D scroll logs"),
+		bodyStyle.Render("  Home/End jump to top/bottom logs"),
+		bodyStyle.Render("  mouse    wheel scroll (over log panel)"),
 		"",
-		"Press ? or Esc to close help.",
+		noteStyle.Render("Press ? or Esc to close help."),
 	}
 	body := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return lipgloss.NewStyle().
@@ -109,9 +115,8 @@ func (m *Model) renderHelpOverlay() string {
 		Height(m.height).
 		Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("69")).
-		Background(lipgloss.Color("236")).
-		Foreground(lipgloss.Color("252")).
+		BorderForeground(border).
+		Foreground(panelFg).
 		Render(body)
 }
 
