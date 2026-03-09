@@ -221,3 +221,16 @@ func TestTabSwitchesPaneOnKeyPress(t *testing.T) {
 		t.Fatalf("focus after ctrl+i key press = %v, want markdown", m.focus)
 	}
 }
+
+func TestEnableGlamourMessageTurnsOnMarkdownRenderer(t *testing.T) {
+	doc := ParseMarkdown("# A\ntext\n")
+	m := NewModel(doc, "test.md")
+	if m.useGlamour {
+		t.Fatal("expected glamour to be disabled initially")
+	}
+
+	m.Update(enableGlamourMsg{})
+	if !m.useGlamour {
+		t.Fatal("expected glamour to be enabled after async message")
+	}
+}

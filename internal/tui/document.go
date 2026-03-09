@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 )
@@ -13,12 +14,13 @@ const (
 )
 
 type OutlineItem struct {
-	Title  string
-	Level  int
-	Line   int
-	Kind   NodeKind
-	Lang   string
-	Parent int
+	Title   string
+	Level   int
+	Line    int
+	EndLine int
+	Kind    NodeKind
+	Lang    string
+	Parent  int
 }
 
 type Document struct {
@@ -28,29 +30,41 @@ type Document struct {
 
 // ParseMarkdown builds a lightweight document model for rendering and navigation.
 func ParseMarkdown(src string) Document {
-	lines := strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n")
+	lines := make([]string, 0, 256)
 	outline := make([]OutlineItem, 0)
 	headingAtLevel := map[int]int{}
 	inFence := false
+	openExecOutlineIdx := -1
 
-	for i, raw := range lines {
+	scanner := bufio.NewScanner(strings.NewReader(src))
+	// Allow larger markdown lines/code lines without scanner truncation.
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 4*1024*1024)
+
+	lineNo := 0
+	for scanner.Scan() {
+		raw := strings.TrimSuffix(scanner.Text(), "\r")
+		lines = append(lines, raw)
 		trimmed := strings.TrimSpace(raw)
+
 		if !inFence && strings.HasPrefix(trimmed, "#") {
 			level := headingLevel(trimmed)
 			if level > 0 {
 				title := strings.TrimSpace(trimmed[level:])
 				parent := nearestHeadingParent(headingAtLevel, level)
 				outline = append(outline, OutlineItem{
-					Title:  title,
-					Level:  level,
-					Line:   i,
-					Kind:   NodeHeading,
-					Parent: parent,
+					Title:   title,
+					Level:   level,
+					Line:    lineNo,
+					EndLine: lineNo,
+					Kind:    NodeHeading,
+					Parent:  parent,
 				})
 				headingAtLevel[level] = len(outline) - 1
 				for l := level + 1; l <= 6; l++ {
 					delete(headingAtLevel, l)
 				}
+				lineNo++
 				continue
 			}
 		}
@@ -58,6 +72,11 @@ func ParseMarkdown(src string) Document {
 		if strings.HasPrefix(trimmed, "```") {
 			if inFence {
 				inFence = false
+				if openExecOutlineIdx >= 0 && openExecOutlineIdx < len(outline) {
+					outline[openExecOutlineIdx].EndLine = lineNo
+				}
+				openExecOutlineIdx = -1
+				lineNo++
 				continue
 			}
 
@@ -68,20 +87,70 @@ func ParseMarkdown(src string) Document {
 			}
 			parent := nearestHeadingParent(headingAtLevel, 7)
 			outline = append(outline, OutlineItem{
-				Title:  fmt.Sprintf("%s block", lang),
-				Level:  7,
-				Line:   i,
-				Kind:   NodeExec,
-				Lang:   strings.ToLower(lang),
-				Parent: parent,
+				Title:   fmt.Sprintf("%s block", lang),
+				Level:   7,
+				Line:    lineNo,
+				EndLine: lineNo,
+				Kind:    NodeExec,
+				Lang:    strings.ToLower(lang),
+				Parent:  parent,
 			})
+			openExecOutlineIdx = len(outline) - 1
 		}
+		lineNo++
 	}
+
+	// Match strings.Split behavior that keeps a trailing empty line.
+	if strings.HasSuffix(src, "\n") {
+		lines = append(lines, "")
+	}
+	lastLine := docMax(0, len(lines)-1)
+	if openExecOutlineIdx >= 0 && openExecOutlineIdx < len(outline) {
+		outline[openExecOutlineIdx].EndLine = lastLine
+	}
+	assignHeadingEndLines(outline, lastLine)
 
 	return Document{
 		Lines:   lines,
 		Outline: outline,
 	}
+}
+
+func assignHeadingEndLines(outline []OutlineItem, lastLine int) {
+	nextHeadingAtLevel := [7]int{}
+	for i := range nextHeadingAtLevel {
+		nextHeadingAtLevel[i] = -1
+	}
+
+	for i := len(outline) - 1; i >= 0; i-- {
+		if outline[i].Kind != NodeHeading {
+			if outline[i].EndLine == 0 {
+				outline[i].EndLine = lastLine
+			}
+			continue
+		}
+
+		end := lastLine
+		for lvl := 1; lvl <= outline[i].Level; lvl++ {
+			if next := nextHeadingAtLevel[lvl]; next >= 0 {
+				if next-1 < end {
+					end = next - 1
+				}
+			}
+		}
+		if end < outline[i].Line {
+			end = outline[i].Line
+		}
+		outline[i].EndLine = end
+		nextHeadingAtLevel[outline[i].Level] = outline[i].Line
+	}
+}
+
+func docMax(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func headingLevel(line string) int {

@@ -2,7 +2,7 @@ package tui
 
 import (
 	"slices"
-	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -25,8 +25,9 @@ type Model struct {
 	mdTop      int
 	outlineIdx int
 
-	collapsed map[int]bool
-	execOnly  bool
+	collapsed  map[int]bool
+	execOnly   bool
+	useGlamour bool
 
 	mdCacheStart     int
 	mdCacheHeight    int
@@ -37,21 +38,28 @@ type Model struct {
 
 func NewModel(doc Document, fileName string) *Model {
 	return &Model{
-		doc:       doc,
-		fileName:  fileName,
-		focus:     PaneMarkdown,
-		collapsed: map[int]bool{},
+		doc:        doc,
+		fileName:   fileName,
+		focus:      PaneMarkdown,
+		collapsed:  map[int]bool{},
+		useGlamour: false,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return tea.Tick(10*time.Millisecond, func(time.Time) tea.Msg {
+		return enableGlamourMsg{}
+	})
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch x := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.SetViewport(x.Width, x.Height)
+		return m, nil
+	case enableGlamourMsg:
+		m.useGlamour = true
+		m.invalidateMarkdownCache()
 		return m, nil
 	case tea.KeyMsg:
 		if _, isRelease := x.(tea.KeyReleaseMsg); isRelease {
@@ -66,6 +74,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+type enableGlamourMsg struct{}
+
+func (m *Model) invalidateMarkdownCache() {
+	m.mdCacheStart = 0
+	m.mdCacheHeight = 0
+	m.mdCacheWidth = 0
+	m.mdCacheLineCount = 0
+	m.mdCacheLines = nil
 }
 
 func (m *Model) View() tea.View {
@@ -472,30 +490,7 @@ func (m *Model) outlineLineRange(idx int) (int, int, bool) {
 
 	item := m.doc.Outline[idx]
 	start := clamp(item.Line, 0, len(m.doc.Lines)-1)
-	end := len(m.doc.Lines) - 1
-
-	switch item.Kind {
-	case NodeHeading:
-		for i := idx + 1; i < len(m.doc.Outline); i++ {
-			next := m.doc.Outline[i]
-			if next.Kind == NodeHeading && next.Level <= item.Level {
-				end = next.Line - 1
-				break
-			}
-		}
-	case NodeExec:
-		// Prefer fence close line when present.
-		for line := start + 1; line < len(m.doc.Lines); line++ {
-			if strings.HasPrefix(strings.TrimSpace(m.doc.Lines[line]), "```") {
-				end = line
-				break
-			}
-		}
-	}
-
-	if end < start {
-		end = start
-	}
+	end := clamp(item.EndLine, start, len(m.doc.Lines)-1)
 	return start, clamp(end, start, len(m.doc.Lines)-1), true
 }
 

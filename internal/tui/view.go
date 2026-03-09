@@ -117,6 +117,12 @@ func (m *Model) renderMarkdownBody(height, width int) []string {
 		return m.mdCacheLines
 	}
 
+	if !m.useGlamour {
+		lines := m.markdownFallbackLines(start, height, width)
+		m.storeMarkdownCache(start, height, width, lines)
+		return lines
+	}
+
 	end := min(len(m.doc.Lines), start+height)
 	snippet := strings.Join(m.doc.Lines[start:end], "\n")
 
