@@ -124,9 +124,3 @@ Run tests:
 ```bash
 make test
 ```
-
-Run deterministic repository checks:
-
-```bash
-make quality-gate
-```
