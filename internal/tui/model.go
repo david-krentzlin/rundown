@@ -53,6 +53,7 @@ type Model struct {
 	execLogScroll   int
 	execFollowTail  bool
 	helpVisible     bool
+	shellSessions   map[string]*shellSession
 }
 
 func NewModel(doc Document, fileName string) *Model {
@@ -74,6 +75,7 @@ func NewModel(doc Document, fileName string) *Model {
 		execViewIndex:   map[string]int{},
 		execViewBlockID: "",
 		execFollowTail:  true,
+		shellSessions:   map[string]*shellSession{},
 	}
 }
 
@@ -134,7 +136,7 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 		switch {
 		case x.killed:
 			m.execStatus = "killed"
-		case x.err != nil:
+		case x.err != nil || x.exitCode != 0:
 			m.execStatus = fmt.Sprintf("failed (%d)", x.exitCode)
 		default:
 			m.execStatus = fmt.Sprintf("completed (%d)", x.exitCode)
@@ -153,6 +155,8 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 			last.Status = m.execStatus
 			m.execHistory[m.execRunBlockID] = h
 		}
+		m.execCancel = nil
+		m.execMsgCh = nil
 		return nil, true
 	case execChannelClosedMsg:
 		return nil, true
@@ -212,6 +216,7 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
 		m.stopExecution()
+		m.closeAllShellSessions()
 		return true, nil, true
 	case "?":
 		m.helpVisible = true
@@ -240,6 +245,7 @@ func (m *Model) handleHelpOverlayKey(key string) (bool, tea.Cmd, bool) {
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
 		m.stopExecution()
+		m.closeAllShellSessions()
 		return true, nil, true
 	case "?", "esc":
 		m.helpVisible = false

@@ -21,6 +21,7 @@ type OutlineItem struct {
 	EndLine int
 	Kind    NodeKind
 	Lang    string
+	Session bool
 	Parent  int
 }
 
@@ -83,7 +84,8 @@ func ParseMarkdown(src string) Document {
 			}
 
 			inFence = true
-			lang := strings.TrimSpace(strings.TrimPrefix(trimmed, "```"))
+			info := strings.TrimSpace(strings.TrimPrefix(trimmed, "```"))
+			lang, session := parseFenceInfo(info)
 			if lang == "" {
 				lang = "text"
 			}
@@ -96,6 +98,7 @@ func ParseMarkdown(src string) Document {
 				EndLine: lineNo,
 				Kind:    NodeExec,
 				Lang:    strings.ToLower(lang),
+				Session: session,
 				Parent:  parent,
 			})
 			openExecOutlineIdx = len(outline) - 1
@@ -181,4 +184,22 @@ func nearestHeadingParent(levelIdx map[int]int, level int) int {
 
 func outlineID(kind NodeKind, lineNo, ordinal int) string {
 	return fmt.Sprintf("%d:%d:%d", kind, lineNo, ordinal)
+}
+
+func parseFenceInfo(info string) (string, bool) {
+	if info == "" {
+		return "", false
+	}
+	fields := strings.Fields(info)
+	if len(fields) == 0 {
+		return "", false
+	}
+	lang := fields[0]
+	session := false
+	for _, field := range fields[1:] {
+		if field == "session=true" {
+			session = true
+		}
+	}
+	return lang, session
 }

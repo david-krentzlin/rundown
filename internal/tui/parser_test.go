@@ -31,3 +31,22 @@ func TestParseMarkdownBuildsOutlineWithHeadingsAndExecBlocks(t *testing.T) {
 		}
 	}
 }
+
+func TestParseMarkdownExecBlockParsesSessionOption(t *testing.T) {
+	src := "# Title\n```bash session=true\necho hi\n```\n"
+	doc := ParseMarkdown(src)
+
+	if len(doc.Outline) < 2 {
+		t.Fatalf("outline length = %d, want at least 2", len(doc.Outline))
+	}
+	exec := doc.Outline[1]
+	if exec.Kind != NodeExec {
+		t.Fatalf("kind = %v, want NodeExec", exec.Kind)
+	}
+	if exec.Lang != "bash" {
+		t.Fatalf("lang = %q, want bash", exec.Lang)
+	}
+	if !exec.Session {
+		t.Fatal("expected session=true to enable persistent session mode")
+	}
+}
