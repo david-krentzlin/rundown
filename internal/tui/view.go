@@ -133,8 +133,7 @@ func (m *Model) renderLogPanel(height int) string {
 	status := rec.Status
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
-	hintLine := m.renderPaneHint(bodyW, m.focus == PaneLog, "[ prev run  ] next run  PgUp/PgDn scroll  Home/End jump  v close")
-	visible := max(1, height-5) // border top/bottom + title + meta + hint
+	visible := max(1, height-4) // border top/bottom + title + meta
 	renderedLogs := m.visibleExecLogs(rec)
 	maxScroll := max(0, len(renderedLogs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
@@ -164,7 +163,6 @@ func (m *Model) renderLogPanel(height int) string {
 				lipgloss.Left,
 				titleLine,
 				metaLine,
-				hintLine,
 				lipgloss.NewStyle().Width(bodyW).Height(visible).Render(content),
 			),
 		)
@@ -239,6 +237,12 @@ func (m *Model) renderExecMetaLine(rec ExecRecord, current, total, width int) st
 		Foreground(lipgloss.Color("231")).
 		Background(execStatusAccent(rec.Status)).
 		Padding(0, 1)
+	keysLabelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
+	keysTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	if m.focus == PaneLog {
+		keysLabelStyle = keysLabelStyle.Foreground(lipgloss.Color("117"))
+		keysTextStyle = keysTextStyle.Foreground(lipgloss.Color("249"))
+	}
 
 	parts := []string{}
 	if rec.Command != "" {
@@ -254,6 +258,8 @@ func (m *Model) renderExecMetaLine(rec ExecRecord, current, total, width int) st
 		}
 		parts = append(parts, statusStyle.Render(statusText))
 	}
+	keys := keysLabelStyle.Render("keys") + " " + keysTextStyle.Render("[/] runs  PgUp/PgDn scroll  Home/End  v close")
+	parts = append(parts, keys)
 	return clipLine(strings.Join(parts, "   "), width)
 }
 
