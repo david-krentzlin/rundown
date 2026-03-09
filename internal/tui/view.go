@@ -305,6 +305,8 @@ func iconForLang(lang string) string {
 	switch lang {
 	case "bash", "sh", "zsh":
 		return ""
+	case "ruby", "rb":
+		return ""
 	case "go":
 		return ""
 	case "python", "py":
@@ -313,6 +315,22 @@ func iconForLang(lang string) string {
 		return ""
 	case "typescript", "ts":
 		return ""
+	case "rust", "rs":
+		return ""
+	case "java":
+		return ""
+	case "kotlin", "kt":
+		return ""
+	case "php":
+		return ""
+	case "lua":
+		return ""
+	case "json":
+		return ""
+	case "yaml", "yml":
+		return ""
+	case "dockerfile":
+		return ""
 	default:
 		return "▶"
 	}
