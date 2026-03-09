@@ -1,7 +1,6 @@
 # rundown
 
-`rundown` is a terminal UI for reading Markdown with a synchronized outline pane.
-It is built with Bubble Tea v2 and uses Lip Gloss for layout/styling.
+`rundown` is a terminal UI for reading Markdown that allows you to navigate using outline and execute code blocks in the file.
 
 <img width="2348" height="1292" alt="image" src="https://github.com/user-attachments/assets/e1f3447e-1974-49fc-bdaa-c422c5e90f65" />
 
