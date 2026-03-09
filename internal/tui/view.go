@@ -131,12 +131,13 @@ func (m *Model) renderLogPanel(height int) string {
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
 	visible := max(1, height-4) // border top/bottom + title + meta
-	maxScroll := max(0, len(rec.Logs)-visible)
+	renderedLogs := m.visibleExecLogs(rec)
+	maxScroll := max(0, len(renderedLogs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
 	start := m.execLogScroll
-	end := min(len(rec.Logs), start+visible)
+	end := min(len(renderedLogs), start+visible)
 	lines := make([]string, 0, visible)
-	for _, line := range rec.Logs[start:end] {
+	for _, line := range renderedLogs[start:end] {
 		lines = append(lines, m.renderExecLogLine(line, bodyW))
 	}
 	for len(lines) < visible {
@@ -159,6 +160,17 @@ func (m *Model) renderLogPanel(height int) string {
 			),
 		)
 	return panel
+}
+
+func (m *Model) visibleExecLogs(rec ExecRecord) []ExecLogLine {
+	out := make([]ExecLogLine, 0, len(rec.Logs))
+	for _, line := range rec.Logs {
+		if line.Kind == "command" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) string {

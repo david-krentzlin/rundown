@@ -82,7 +82,7 @@ func (m *Model) execScroll(delta int) {
 	if !ok {
 		return
 	}
-	maxScroll := max(0, len(rec.Logs)-max(1, m.logPanelHeight()-4))
+	maxScroll := max(0, len(m.visibleExecLogs(rec))-max(1, m.logPanelHeight()-4))
 	m.execLogScroll = clamp(m.execLogScroll+delta, 0, maxScroll)
 	if m.execLogScroll >= maxScroll {
 		m.execFollowTail = true

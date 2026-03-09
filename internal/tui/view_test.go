@@ -116,3 +116,21 @@ func TestRenderExecLogLineStylesStderr(t *testing.T) {
 		t.Fatalf("expected styled stderr line, got %q", line)
 	}
 }
+
+func TestVisibleExecLogsSkipsCommandLine(t *testing.T) {
+	m := NewModel(ParseMarkdown("# A\n"), "test.md")
+	rec := ExecRecord{
+		Logs: []ExecLogLine{
+			{Text: "$ bash -lc echo hi", Kind: "command"},
+			{Text: "hello", Kind: "output"},
+			{Text: "[done] status=completed (0)", Kind: "result"},
+		},
+	}
+	got := m.visibleExecLogs(rec)
+	if len(got) != 2 {
+		t.Fatalf("visible log count = %d, want 2", len(got))
+	}
+	if got[0].Text != "hello" {
+		t.Fatalf("first visible log = %q, want hello", got[0].Text)
+	}
+}
