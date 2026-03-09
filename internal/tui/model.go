@@ -50,6 +50,7 @@ type Model struct {
 	execViewIndex   map[string]int
 	execViewBlockID string
 	execLogScroll   int
+	execFollowTail  bool
 }
 
 func NewModel(doc Document, fileName string) *Model {
@@ -70,6 +71,7 @@ func NewModel(doc Document, fileName string) *Model {
 		execHistory:     map[string][]ExecRecord{},
 		execViewIndex:   map[string]int{},
 		execViewBlockID: "",
+		execFollowTail:  true,
 	}
 }
 
@@ -115,6 +117,10 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 			last := &h[len(h)-1]
 			last.Logs = append(last.Logs, x.line)
 			m.execHistory[m.execRunBlockID] = h
+		}
+		if m.execFollowTail && m.execRunning && m.isViewingActiveRun() {
+			m.execLogScroll = 1 << 30
+			m.execScroll(0)
 		}
 		if m.execRunning && m.execMsgCh != nil {
 			return waitExecEvent(m.execMsgCh), true
@@ -206,15 +212,18 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 		m.execNextRecord()
 		return false, nil, true
 	case "pgup", "ctrl+u":
+		m.execFollowTail = false
 		m.execScroll(-5)
 		return false, nil, true
 	case "pgdown", "ctrl+d":
 		m.execScroll(5)
 		return false, nil, true
 	case "home":
+		m.execFollowTail = false
 		m.execLogScroll = 0
 		return false, nil, true
 	case "end":
+		m.execFollowTail = true
 		m.execLogScroll = 1 << 30
 		m.execScroll(0)
 		return false, nil, true
@@ -322,6 +331,7 @@ func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) {
 	if m.execPanelVisible && m.isInLogPanel(mouse.Y) {
 		switch mouse.Button {
 		case tea.MouseWheelUp:
+			m.execFollowTail = false
 			m.execScroll(-3)
 		case tea.MouseWheelDown:
 			m.execScroll(3)

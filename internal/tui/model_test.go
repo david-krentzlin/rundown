@@ -380,6 +380,65 @@ func TestExecScrollClampsUsingFullVisibleLogArea(t *testing.T) {
 	}
 }
 
+func TestExecLineAutoScrollsWhenFollowingTail(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(80, 24)
+
+	execIdx := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind == NodeExec {
+			execIdx = i
+			break
+		}
+	}
+	if execIdx < 0 {
+		t.Fatal("expected executable block")
+	}
+	blockID := m.doc.Outline[execIdx].ID
+	m.outlineIdx = execIdx
+	m.execRunBlockID = blockID
+	m.execViewBlockID = blockID
+	m.execRunning = true
+	m.execFollowTail = true
+	visible := max(1, m.logPanelHeight()-3)
+	logs := make([]string, visible+3)
+	for i := range logs {
+		logs[i] = fmt.Sprintf("line-%d", i)
+	}
+	m.execHistory[blockID] = []ExecRecord{{
+		Title:  "bash block",
+		Lang:   "bash",
+		Status: "running",
+		Logs:   logs,
+	}}
+	m.execViewIndex[blockID] = 0
+	m.execLogScroll = 0
+
+	m.handleInternalMsg(execLineMsg{line: "next-line"})
+	if m.execLogScroll == 0 {
+		t.Fatalf("execLogScroll = %d, want >0 after auto-follow append", m.execLogScroll)
+	}
+}
+
+func TestManualScrollUpDisablesTailFollow(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(80, 24)
+	m.execFollowTail = true
+
+	m.handleKey("pgup")
+	if m.execFollowTail {
+		t.Fatal("expected pgup to disable log tail follow mode")
+	}
+	m.handleKey("end")
+	if !m.execFollowTail {
+		t.Fatal("expected end to re-enable log tail follow mode")
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0

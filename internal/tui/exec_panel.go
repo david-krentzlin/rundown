@@ -42,6 +42,7 @@ func (m *Model) execPrevRecord() {
 		m.execViewIndex[blockID]--
 		m.execLogScroll = 0
 		m.execViewBlockID = blockID
+		m.execFollowTail = false
 	}
 }
 
@@ -60,6 +61,7 @@ func (m *Model) execNextRecord() {
 		m.execViewIndex[blockID]++
 		m.execLogScroll = 0
 		m.execViewBlockID = blockID
+		m.execFollowTail = false
 	}
 }
 
@@ -75,9 +77,15 @@ func (m *Model) execScroll(delta int) {
 	if outline < 0 {
 		return
 	}
+	if delta < 0 {
+		m.execFollowTail = false
+	}
 	_, logs, _, _, _ := m.execPanelData()
 	maxScroll := max(0, len(logs)-max(1, m.logPanelHeight()-3))
 	m.execLogScroll = clamp(m.execLogScroll+delta, 0, maxScroll)
+	if m.execLogScroll >= maxScroll {
+		m.execFollowTail = true
+	}
 }
 
 func (m *Model) execPanelData() (string, []string, string, int, int) {
@@ -107,4 +115,12 @@ func (m *Model) outlineIndexByID(blockID string) int {
 		}
 	}
 	return -1
+}
+
+func (m *Model) isViewingActiveRun() bool {
+	outline := m.panelOutline()
+	if outline < 0 || !m.validOutlineIndex(outline) {
+		return false
+	}
+	return m.doc.Outline[outline].ID == m.execRunBlockID
 }

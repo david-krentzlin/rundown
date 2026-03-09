@@ -83,6 +83,7 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 	m.execHistory[m.execRunBlockID] = append(m.execHistory[m.execRunBlockID], record)
 	m.execViewIndex[m.execRunBlockID] = len(m.execHistory[m.execRunBlockID]) - 1
 	m.execViewBlockID = m.execRunBlockID
+	m.execFollowTail = true
 	m.execLogScroll = 0
 
 	go streamExecPipe(stdout, m.execMsgCh)
