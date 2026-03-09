@@ -27,6 +27,12 @@ type Model struct {
 
 	collapsed map[int]bool
 	execOnly  bool
+
+	mdCacheStart     int
+	mdCacheHeight    int
+	mdCacheWidth     int
+	mdCacheLineCount int
+	mdCacheLines     []string
 }
 
 func NewModel(doc Document, fileName string) *Model {
@@ -48,6 +54,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.SetViewport(x.Width, x.Height)
 		return m, nil
 	case tea.KeyMsg:
+		if _, isRelease := x.(tea.KeyReleaseMsg); isRelease {
+			return m, nil
+		}
 		if m.handleKey(x.String()) {
 			return m, tea.Quit
 		}
@@ -76,7 +85,7 @@ func (m *Model) handleKey(key string) bool {
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
 		return true
-	case "tab":
+	case "tab", "ctrl+i":
 		if m.focus == PaneMarkdown {
 			m.focus = PaneOutline
 		} else {

@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/glamour"
 )
+
+var markdownRendererCache = map[int]*glamour.TermRenderer{}
 
 func (m *Model) render() string {
 	if m.width <= 0 || m.height <= 0 {
@@ -85,58 +88,126 @@ func (m *Model) renderMarkdown(height, width int) string {
 		return ""
 	}
 
+	gutterW := 2
+	bodyW := max(1, width-gutterW-1)
+	bodyLines := m.renderMarkdownBody(height, bodyW)
 	selStart, selEnd, hasSelection := m.selectedLineRange()
-	lines := make([]string, 0, height)
+	rows := make([]string, 0, height)
 
 	for row := 0; row < height; row++ {
 		lineIdx := m.mdTop + row
-		lines = append(lines, m.renderMarkdownRow(lineIdx, width, selStart, selEnd, hasSelection))
+		bar := m.markdownSelectionBar(lineIdx, selStart, selEnd, hasSelection)
+		content := ""
+		if row < len(bodyLines) {
+			content = bodyLines[row]
+		}
+		rows = append(rows, padLine(bar+" "+content, width))
 	}
 
-	return strings.Join(lines, "\n")
+	return strings.Join(rows, "\n")
 }
 
-func (m *Model) renderMarkdownRow(lineIdx, width, selStart, selEnd int, hasSelection bool) string {
-	if lineIdx >= len(m.doc.Lines) {
-		return padLine("", width)
+func (m *Model) renderMarkdownBody(height, width int) []string {
+	start := clamp(m.mdTop, 0, max(0, len(m.doc.Lines)-1))
+	if m.mdCacheLines != nil &&
+		m.mdCacheStart == start &&
+		m.mdCacheHeight == height &&
+		m.mdCacheWidth == width &&
+		m.mdCacheLineCount == len(m.doc.Lines) {
+		return m.mdCacheLines
 	}
 
-	content := renderMarkdownLine(m.doc.Lines[lineIdx])
+	end := min(len(m.doc.Lines), start+height)
+	snippet := strings.Join(m.doc.Lines[start:end], "\n")
+
+	renderer, err := markdownRenderer(width)
+	if err != nil {
+		lines := m.markdownFallbackLines(start, height, width)
+		m.storeMarkdownCache(start, height, width, lines)
+		return lines
+	}
+
+	rendered, err := renderer.Render(snippet)
+	if err != nil {
+		lines := m.markdownFallbackLines(start, height, width)
+		m.storeMarkdownCache(start, height, width, lines)
+		return lines
+	}
+
+	lines := strings.Split(strings.TrimSuffix(rendered, "\n"), "\n")
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	for len(lines) < height {
+		lines = append(lines, "")
+	}
+	m.storeMarkdownCache(start, height, width, lines)
+	return lines
+}
+
+func markdownRenderer(width int) (*glamour.TermRenderer, error) {
+	if r, ok := markdownRendererCache[width]; ok {
+		return r, nil
+	}
+	r, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return nil, err
+	}
+	markdownRendererCache[width] = r
+	return r, nil
+}
+
+func (m *Model) storeMarkdownCache(start, height, width int, lines []string) {
+	m.mdCacheStart = start
+	m.mdCacheHeight = height
+	m.mdCacheWidth = width
+	m.mdCacheLineCount = len(m.doc.Lines)
+	m.mdCacheLines = lines
+}
+
+func (m *Model) markdownFallbackLines(start, height, width int) []string {
+	lines := make([]string, 0, height)
+	for row := 0; row < height; row++ {
+		lineIdx := start + row
+		if lineIdx >= len(m.doc.Lines) {
+			lines = append(lines, "")
+			continue
+		}
+		lines = append(lines, padLine(renderMarkdownLine(m.doc.Lines[lineIdx]), width))
+	}
+	return lines
+}
+
+func (m *Model) markdownSelectionBar(lineIdx, selStart, selEnd int, hasSelection bool) string {
 	selected := hasSelection && lineIdx >= selStart && lineIdx <= selEnd
 	prefix := selectionPrefix(lineIdx, selStart, selEnd, selected)
 	if lineIdx == m.cursorLine {
-		prefix = "▸ "
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("87")).Bold(true).Render("▌ ")
+	}
+	if !selected {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("239")).Render("│ ")
 	}
 
-	style := markdownLineStyle(lineIdx == m.cursorLine, selected)
-	return padLine(style.Render(prefix+content), width)
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true).Render(prefix)
 }
 
 func selectionPrefix(lineIdx, selStart, selEnd int, selected bool) string {
 	if !selected {
-		return "  "
+		return "│ "
 	}
 	switch {
 	case lineIdx == selStart && lineIdx == selEnd:
-		return "◆ "
+		return "▣ "
 	case lineIdx == selStart:
-		return "┌ "
+		return "┏ "
 	case lineIdx == selEnd:
-		return "└ "
+		return "┗ "
 	default:
-		return "│ "
+		return "┃ "
 	}
-}
-
-func markdownLineStyle(isCursor, selected bool) lipgloss.Style {
-	style := lipgloss.NewStyle()
-	if selected {
-		style = style.Background(lipgloss.Color("236"))
-	}
-	if isCursor {
-		style = style.Background(lipgloss.Color("24")).Foreground(lipgloss.Color("230")).Bold(true)
-	}
-	return style
 }
 
 func renderMarkdownLine(line string) string {
