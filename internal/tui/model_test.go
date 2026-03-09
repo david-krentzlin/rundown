@@ -19,6 +19,12 @@ func TestModelSyncMarkdownToOutline(t *testing.T) {
 	if got := m.outlineIdx; got != 2 {
 		t.Fatalf("outlineIdx = %d, want 2", got)
 	}
+
+	m.cursorLine = 6 // below the code block
+	m.syncOutlineFromMarkdown()
+	if got := m.outlineIdx; got != 1 {
+		t.Fatalf("outlineIdx after leaving exec block = %d, want 1", got)
+	}
 }
 
 func TestModelSyncOutlineToMarkdown(t *testing.T) {
@@ -31,6 +37,9 @@ func TestModelSyncOutlineToMarkdown(t *testing.T) {
 
 	if got, want := m.cursorLine, doc.Outline[1].Line; got != want {
 		t.Fatalf("cursorLine = %d, want %d", got, want)
+	}
+	if got, want := m.mdTop, 0; got != want {
+		t.Fatalf("mdTop = %d, want %d", got, want)
 	}
 }
 
@@ -145,6 +154,22 @@ func TestMouseWheelScrollsMarkdownPane(t *testing.T) {
 	m.handleMouseWheel(tea.MouseWheelMsg(tea.Mouse{X: 90, Y: 2, Button: tea.MouseWheelDown}))
 	if m.mdTop != before {
 		t.Fatalf("mdTop changed from %d to %d when wheel event was outside markdown pane", before, m.mdTop)
+	}
+}
+
+func TestSyncOutlineToMarkdownSetsTopWithContext(t *testing.T) {
+	doc := ParseMarkdown("# A\n1\n2\n3\n4\n5\n## B\nline\n")
+	m := NewModel(doc, "test.md")
+	m.SetViewport(80, 8)
+	m.outlineIdx = 1 // heading B at line 6
+
+	m.syncMarkdownFromOutline()
+
+	if got, want := m.cursorLine, 6; got != want {
+		t.Fatalf("cursorLine = %d, want %d", got, want)
+	}
+	if got, want := m.mdTop, 1; got != want {
+		t.Fatalf("mdTop = %d, want %d", got, want)
 	}
 }
 

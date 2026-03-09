@@ -302,12 +302,34 @@ func (m *Model) syncOutlineFromMarkdown() {
 	if len(m.doc.Outline) == 0 {
 		return
 	}
-	candidate := 0
+
+	// Prefer executable block only while cursor is actually inside its fenced range.
 	for i, item := range m.doc.Outline {
-		if item.Line <= m.cursorLine {
+		if item.Kind != NodeExec {
+			continue
+		}
+		start, end, ok := m.outlineLineRange(i)
+		if ok && m.cursorLine >= start && m.cursorLine <= end {
+			m.outlineIdx = i
+			m.ensureOutlineIndexVisible()
+			return
+		}
+	}
+
+	// Otherwise choose the deepest heading section containing the cursor.
+	candidate := 0
+	bestLevel := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind != NodeHeading {
+			continue
+		}
+		start, end, ok := m.outlineLineRange(i)
+		if !ok {
+			continue
+		}
+		if m.cursorLine >= start && m.cursorLine <= end && item.Level >= bestLevel {
 			candidate = i
-		} else {
-			break
+			bestLevel = item.Level
 		}
 	}
 	m.outlineIdx = candidate
@@ -318,7 +340,12 @@ func (m *Model) syncMarkdownFromOutline() {
 	if !m.validOutlineIndex(m.outlineIdx) {
 		return
 	}
-	m.cursorLine = m.doc.Outline[m.outlineIdx].Line
+	start, _, ok := m.outlineLineRange(m.outlineIdx)
+	if !ok {
+		start = m.doc.Outline[m.outlineIdx].Line
+	}
+	m.cursorLine = start
+	m.mdTop = clamp(start-5, 0, max(0, len(m.doc.Lines)-m.mainHeight()))
 	m.ensureMarkdownCursorVisible()
 }
 
@@ -435,17 +462,21 @@ func (m *Model) isInMarkdownPane(x, y int) bool {
 }
 
 func (m *Model) selectedLineRange() (int, int, bool) {
-	if !m.validOutlineIndex(m.outlineIdx) || len(m.doc.Lines) == 0 {
+	return m.outlineLineRange(m.outlineIdx)
+}
+
+func (m *Model) outlineLineRange(idx int) (int, int, bool) {
+	if !m.validOutlineIndex(idx) || len(m.doc.Lines) == 0 {
 		return 0, 0, false
 	}
 
-	item := m.doc.Outline[m.outlineIdx]
+	item := m.doc.Outline[idx]
 	start := clamp(item.Line, 0, len(m.doc.Lines)-1)
 	end := len(m.doc.Lines) - 1
 
 	switch item.Kind {
 	case NodeHeading:
-		for i := m.outlineIdx + 1; i < len(m.doc.Outline); i++ {
+		for i := idx + 1; i < len(m.doc.Outline); i++ {
 			next := m.doc.Outline[i]
 			if next.Kind == NodeHeading && next.Level <= item.Level {
 				end = next.Line - 1
