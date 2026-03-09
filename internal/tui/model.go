@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -34,6 +36,15 @@ type Model struct {
 	mdCacheWidth     int
 	mdCacheLineCount int
 	mdCacheLines     []string
+
+	execPanelVisible bool
+	execRunning      bool
+	execStatus       string
+	execTitle        string
+	execLogs         []string
+	execStartedAt    time.Time
+	execCancel       context.CancelFunc
+	execMsgCh        chan tea.Msg
 }
 
 func NewModel(doc Document, fileName string) *Model {
@@ -65,11 +76,36 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if _, isRelease := x.(tea.KeyReleaseMsg); isRelease {
 			return m, nil
 		}
-		if m.handleKey(x.String()) {
+		quit, cmd := m.handleKey(x.String())
+		if quit {
 			return m, tea.Quit
 		}
+		return m, cmd
 	case tea.MouseWheelMsg:
 		m.handleMouseWheel(x)
+		return m, nil
+	case execLineMsg:
+		m.execLogs = append(m.execLogs, x.line)
+		if len(m.execLogs) > 2000 {
+			m.execLogs = m.execLogs[len(m.execLogs)-2000:]
+		}
+		if m.execRunning && m.execMsgCh != nil {
+			return m, waitExecEvent(m.execMsgCh)
+		}
+		return m, nil
+	case execDoneMsg:
+		m.execRunning = false
+		switch {
+		case x.killed:
+			m.execStatus = "killed"
+		case x.err != nil:
+			m.execStatus = fmt.Sprintf("failed (%d)", x.exitCode)
+		default:
+			m.execStatus = fmt.Sprintf("completed (%d)", x.exitCode)
+		}
+		m.execLogs = append(m.execLogs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
+		return m, nil
+	case execChannelClosedMsg:
 		return m, nil
 	}
 
@@ -99,25 +135,29 @@ func (m *Model) SetViewport(width, height int) {
 	m.ensureBounds()
 }
 
-func (m *Model) handleKey(key string) bool {
+func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
-		return true
+		return true, nil
+	case "ctrl+x":
+		m.stopExecution()
+		return false, nil
 	case "tab", "ctrl+i":
 		if m.focus == PaneMarkdown {
 			m.focus = PaneOutline
 		} else {
 			m.focus = PaneMarkdown
 		}
-		return false
+		return false, nil
 	}
 
 	if m.focus == PaneMarkdown {
 		m.handleMarkdownKey(key)
+		return false, nil
 	} else {
-		m.handleOutlineKey(key)
+		cmd := m.handleOutlineKey(key)
+		return false, cmd
 	}
-	return false
 }
 
 func (m *Model) handleMarkdownKey(key string) {
@@ -137,7 +177,7 @@ func (m *Model) handleMarkdownKey(key string) {
 	}
 }
 
-func (m *Model) handleOutlineKey(key string) {
+func (m *Model) handleOutlineKey(key string) tea.Cmd {
 	switch key {
 	case "j", "down":
 		m.moveOutline(1)
@@ -159,9 +199,12 @@ func (m *Model) handleOutlineKey(key string) {
 	case "p":
 		m.jumpExec(-1)
 	case "r":
-		// reserved for execution in a later iteration
+		return m.runSelectedExecutable()
+	case "s":
+		m.stopExecution()
 	}
 	m.syncMarkdownFromOutline()
+	return nil
 }
 
 func (m *Model) handleMouseWheel(msg tea.MouseWheelMsg) {
@@ -460,7 +503,15 @@ func (m *Model) ensureBounds() {
 }
 
 func (m *Model) mainHeight() int {
-	return max(3, m.height-2)
+	h := m.height - 2
+	if m.execPanelVisible {
+		h -= m.logPanelHeight()
+	}
+	return max(3, h)
+}
+
+func (m *Model) logPanelHeight() int {
+	return 8
 }
 
 func (m *Model) leftPaneWidth() int {

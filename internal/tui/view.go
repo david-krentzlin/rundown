@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/glamour"
@@ -18,7 +19,12 @@ func (m *Model) render() string {
 	header := m.renderHeader()
 	main := m.renderMain()
 	footer := m.renderFooter()
-	return lipgloss.JoinVertical(lipgloss.Left, header, main, footer)
+	parts := []string{header, main}
+	if m.execPanelVisible {
+		parts = append(parts, m.renderLogPanel(m.logPanelHeight()))
+	}
+	parts = append(parts, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 func (m *Model) renderHeader() string {
@@ -48,13 +54,56 @@ func (m *Model) renderMain() string {
 }
 
 func (m *Model) renderFooter() string {
-	text := "tab pane  |  quit: C-c C-q Q  |  markdown: hjkl HJKL  |  outline: j/k c/C e/E x n p r"
+	text := "tab pane | quit: C-c C-q Q | markdown: hjkl HJKL | outline: j/k c/C e/E x n p r s(stop)"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("248")).
 		Background(lipgloss.Color("236")).
 		Padding(0, 1).
 		Width(m.width)
 	return style.Render(text)
+}
+
+func (m *Model) renderLogPanel(height int) string {
+	bodyW := max(8, m.width-4)
+	bodyH := max(1, height-2)
+
+	header := fmt.Sprintf("exec: %s | status: %s", m.execTitle, m.execStatus)
+	if m.execRunning {
+		header = fmt.Sprintf("exec: %s | status: running | elapsed: %s", m.execTitle, time.Since(m.execStartedAt).Truncate(time.Second))
+	}
+	lines := append([]string{header, strings.Repeat("─", max(1, bodyW))}, m.tailExecLogs(max(0, bodyH-2))...)
+	for len(lines) < bodyH {
+		lines = append(lines, "")
+	}
+	body := lipgloss.NewStyle().
+		Width(bodyW).
+		Height(bodyH).
+		Render(strings.Join(lines, "\n"))
+
+	borderColor := lipgloss.Color("240")
+	if m.execRunning {
+		borderColor = lipgloss.Color("196")
+	} else if m.execStatus != "" {
+		borderColor = lipgloss.Color("42")
+	}
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(height).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(0, 1).
+		Render(body)
+}
+
+func (m *Model) tailExecLogs(n int) []string {
+	if n <= 0 || len(m.execLogs) == 0 {
+		return nil
+	}
+	if len(m.execLogs) <= n {
+		return m.execLogs
+	}
+	return m.execLogs[len(m.execLogs)-n:]
 }
 
 func (m *Model) renderMarkdownPane(width, height int) string {

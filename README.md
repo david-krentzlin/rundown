@@ -48,6 +48,12 @@ Demo file:
 examples/scroll-demo.md
 ```
 
+Run the safe execution demo:
+
+```bash
+./bin/rundown examples/execution-demo.md
+```
+
 ## Keybindings
 
 Global:
