@@ -132,7 +132,7 @@ func (m *Model) renderLogPanel(height int) string {
 	}
 	status := rec.Status
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
-	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
+	metaLine := m.renderExecMetaLine(rec, bodyW)
 	visible := max(1, height-4) // border top/bottom + title + meta
 	renderedLogs := m.visibleExecLogs(rec)
 	maxScroll := max(0, len(renderedLogs)-visible)
@@ -191,7 +191,7 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		Foreground(lipgloss.Color("236")).
 		Background(lipgloss.Color("186")).
 		Padding(0, 1)
-	focusStyle := lipgloss.NewStyle().
+	labelStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("232")).
 		Background(lipgloss.Color("117")).
@@ -199,26 +199,41 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("230"))
+	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	if m.focus == PaneLog {
+		helpStyle = helpStyle.Foreground(lipgloss.Color("249"))
+	}
 
 	program := execProgramName(rec)
 	if program == "" {
 		program = rec.Lang
 	}
 	left := progStyle.Render(strings.ToUpper(program))
-	rightParts := make([]string, 0, 2)
+	centerParts := []string{titleStyle.Render(rec.Title)}
 	if m.focus == PaneLog {
-		rightParts = append(rightParts, focusStyle.Render("LOG"))
+		centerParts = append(centerParts, labelStyle.Render("LOG"))
 	}
+	center := strings.Join(centerParts, " ")
+	rightParts := make([]string, 0, 3)
 	if total > 0 {
 		rightParts = append(rightParts, runStyle.Render(fmt.Sprintf("run %d/%d", current, total)))
 	}
+	if rec.Status != "" {
+		rightParts = append(rightParts, lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("231")).
+			Background(execStatusAccent(rec.Status)).
+			Padding(0, 1).
+			Render(execStatusLabel(rec, m.execStartedAt)))
+	}
+	rightParts = append(rightParts, helpStyle.Render("[/] PgUp/PgDn Home/End v"))
 	right := strings.Join(rightParts, " ")
 
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
 	gap := 1
 	centerW := max(0, width-leftW-rightW-gap)
-	center := titleStyle.Render(clipLine(rec.Title, centerW))
+	center = clipLine(center, centerW)
 	line := left
 	if centerW > 0 {
 		line += " " + center
@@ -230,36 +245,12 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 	return clipLine(line, width)
 }
 
-func (m *Model) renderExecMetaLine(rec ExecRecord, current, total, width int) string {
+func (m *Model) renderExecMetaLine(rec ExecRecord, width int) string {
 	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	statusStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("231")).
-		Background(execStatusAccent(rec.Status)).
-		Padding(0, 1)
-	keysLabelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("244"))
-	keysTextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	if m.focus == PaneLog {
-		keysLabelStyle = keysLabelStyle.Foreground(lipgloss.Color("117"))
-		keysTextStyle = keysTextStyle.Foreground(lipgloss.Color("249"))
-	}
-
 	parts := []string{}
 	if rec.Command != "" {
 		parts = append(parts, cmdStyle.Render("$ "+rec.Command))
 	}
-	if rec.Status != "" {
-		statusText := rec.Status
-		if rec.Status == "running" {
-			statusText = fmt.Sprintf("running | elapsed %s", time.Since(m.execStartedAt).Truncate(time.Second))
-		}
-		if rec.Duration > 0 && rec.Status != "running" {
-			statusText = fmt.Sprintf("%s | %s", rec.Status, rec.Duration.Truncate(time.Millisecond))
-		}
-		parts = append(parts, statusStyle.Render(statusText))
-	}
-	keys := keysLabelStyle.Render("keys") + " " + keysTextStyle.Render("[/] runs  PgUp/PgDn scroll  Home/End  v close")
-	parts = append(parts, keys)
 	return clipLine(strings.Join(parts, "   "), width)
 }
 
@@ -302,6 +293,16 @@ func execProgramName(rec ExecRecord) string {
 		return ""
 	}
 	return parts[0]
+}
+
+func execStatusLabel(rec ExecRecord, startedAt time.Time) string {
+	if rec.Status == "running" {
+		return fmt.Sprintf("running %s", time.Since(startedAt).Truncate(time.Second))
+	}
+	if rec.Duration > 0 {
+		return fmt.Sprintf("%s %s", rec.Status, rec.Duration.Truncate(time.Millisecond))
+	}
+	return rec.Status
 }
 
 func clipLine(s string, width int) string {

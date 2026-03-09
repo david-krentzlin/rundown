@@ -260,6 +260,8 @@ func (m *Model) handleLogPanelKey(key string) (bool, tea.Cmd, bool) {
 	case "]":
 		m.execNextRecord()
 		return false, nil, true
+	case "r":
+		return false, m.runExecutableAtSelection(), true
 	case "pgup", "ctrl+u":
 		m.execFollowTail = false
 		m.execScroll(-5)
