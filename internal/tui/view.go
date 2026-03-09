@@ -43,7 +43,7 @@ func (m *Model) renderHeader() string {
 }
 
 func (m *Model) renderMain() string {
-	mainH := max(4, m.mainHeight())
+	mainH := m.mainHeight()
 	leftW := max(20, (m.width*2)/3)
 	rightW := max(20, m.width-leftW)
 	leftW = max(20, m.width-rightW)

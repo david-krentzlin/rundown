@@ -233,6 +233,12 @@ func TestEnableGlamourMessageTurnsOnMarkdownRenderer(t *testing.T) {
 	if !m.useGlamour {
 		t.Fatal("expected glamour to be enabled after async message")
 	}
+	if m.execRunning {
+		t.Fatal("execution should not start from glamour enable message")
+	}
+	if len(m.execHistory) != 0 {
+		t.Fatal("execution history should be empty on load")
+	}
 }
 
 func TestLogPanelHeightFitsViewport(t *testing.T) {
@@ -252,4 +258,32 @@ func TestLogPanelHeightFitsViewport(t *testing.T) {
 	if main+panel > m.height-2 {
 		t.Fatalf("layout overflow: main(%d)+panel(%d) > available(%d)", main, panel, m.height-2)
 	}
+}
+
+func TestRenderedViewFitsViewportHeightWithPanel(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(100, 24)
+
+	v := m.View()
+	lines := countLines(v.Content)
+	if lines > m.height {
+		t.Fatalf("rendered lines = %d, viewport height = %d", lines, m.height)
+	}
+}
+
+func TestNewModelSelectsFirstHeadingNotExec(t *testing.T) {
+	doc := ParseMarkdown("```bash\necho hi\n```\n# H1\n")
+	m := NewModel(doc, "test.md")
+	if m.doc.Outline[m.outlineIdx].Kind != NodeHeading {
+		t.Fatalf("initial outline kind = %v, want heading", m.doc.Outline[m.outlineIdx].Kind)
+	}
+}
+
+func countLines(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(s, "\n") + 1
 }

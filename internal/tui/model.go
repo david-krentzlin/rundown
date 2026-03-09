@@ -54,10 +54,19 @@ type Model struct {
 }
 
 func NewModel(doc Document, fileName string) *Model {
+	startIdx := 0
+	for i, item := range doc.Outline {
+		if item.Kind == NodeHeading {
+			startIdx = i
+			break
+		}
+	}
+
 	return &Model{
 		doc:             doc,
 		fileName:        fileName,
 		focus:           PaneMarkdown,
+		outlineIdx:      startIdx,
 		collapsed:       map[int]bool{},
 		useGlamour:      false,
 		execHistory:     map[int][]ExecRecord{},
@@ -177,8 +186,6 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 	case "ctrl+x":
 		m.stopExecution()
 		return false, nil
-	case "r":
-		return false, m.runExecutableAtSelection()
 	case "s":
 		m.stopExecution()
 		return false, nil
