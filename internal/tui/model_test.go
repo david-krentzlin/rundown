@@ -342,6 +342,44 @@ func TestExecHistoryAssociatesByBlockID(t *testing.T) {
 	}
 }
 
+func TestExecScrollClampsUsingFullVisibleLogArea(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(80, 24)
+
+	execIdx := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind == NodeExec {
+			execIdx = i
+			break
+		}
+	}
+	if execIdx < 0 {
+		t.Fatal("expected executable block in outline")
+	}
+
+	blockID := m.doc.Outline[execIdx].ID
+	visible := max(1, m.logPanelHeight()-3)
+	logs := make([]string, visible)
+	for i := 0; i < visible; i++ {
+		logs[i] = fmt.Sprintf("line-%d", i)
+	}
+	m.execHistory[blockID] = []ExecRecord{{
+		Title:  "bash block",
+		Lang:   "bash",
+		Status: "completed (0)",
+		Logs:   logs,
+	}}
+	m.execViewIndex[blockID] = 0
+	m.outlineIdx = execIdx
+
+	m.execScroll(999)
+	if m.execLogScroll != 0 {
+		t.Fatalf("execLogScroll = %d, want 0 when logs exactly fit viewport", m.execLogScroll)
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0

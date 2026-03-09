@@ -73,7 +73,7 @@ func (m *Model) renderLogPanel(height int) string {
 	if status == "running" {
 		header = fmt.Sprintf("%s | run %d/%d | status: running | elapsed: %s", title, current, total, time.Since(m.execStartedAt).Truncate(time.Second))
 	}
-	visible := max(1, height-4) // border row + title row + bottom border row
+	visible := max(1, height-3) // border top/bottom + one title row
 	maxScroll := max(0, len(logs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
 	start := m.execLogScroll
@@ -107,7 +107,7 @@ func clipLine(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	clipped := lipgloss.NewStyle().MaxWidth(width).Render(s)
+	clipped := lipgloss.NewStyle().Inline(true).MaxWidth(width).Render(s)
 	w := lipgloss.Width(clipped)
 	if w >= width {
 		return clipped

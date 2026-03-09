@@ -76,7 +76,7 @@ func (m *Model) execScroll(delta int) {
 		return
 	}
 	_, logs, _, _, _ := m.execPanelData()
-	maxScroll := max(0, len(logs)-max(1, m.logPanelHeight()-4))
+	maxScroll := max(0, len(logs)-max(1, m.logPanelHeight()-3))
 	m.execLogScroll = clamp(m.execLogScroll+delta, 0, maxScroll)
 }
 
