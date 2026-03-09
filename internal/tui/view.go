@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
@@ -69,7 +70,7 @@ func (m *Model) renderLogPanel(height int) string {
 	if total > 0 {
 		header = fmt.Sprintf("%s | run %d/%d | status: %s", title, current, total, status)
 	}
-	if m.execRunning {
+	if status == "running" {
 		header = fmt.Sprintf("%s | run %d/%d | status: running | elapsed: %s", title, current, total, time.Since(m.execStartedAt).Truncate(time.Second))
 	}
 	visible := max(0, bodyH-2)
@@ -86,12 +87,7 @@ func (m *Model) renderLogPanel(height int) string {
 		Height(bodyH).
 		Render(strings.Join(lines, "\n"))
 
-	borderColor := lipgloss.Color("240")
-	if m.execRunning {
-		borderColor = lipgloss.Color("196")
-	} else if m.execStatus != "" {
-		borderColor = lipgloss.Color("42")
-	}
+	borderColor := execBorderColor(status)
 
 	return lipgloss.NewStyle().
 		Width(m.width).
@@ -99,6 +95,21 @@ func (m *Model) renderLogPanel(height int) string {
 		BorderForeground(borderColor).
 		Padding(0, 1).
 		Render(body)
+}
+
+func execBorderColor(status string) color.Color {
+	switch {
+	case status == "running":
+		return lipgloss.Color("221") // beige/yellow
+	case strings.HasPrefix(status, "completed"):
+		return lipgloss.Color("42") // green
+	case strings.HasPrefix(status, "failed"):
+		return lipgloss.Color("196") // red
+	case strings.HasPrefix(status, "killed"):
+		return lipgloss.Color("208")
+	default:
+		return lipgloss.Color("240")
+	}
 }
 
 func (m *Model) tailExecLogs(n int) []string {
