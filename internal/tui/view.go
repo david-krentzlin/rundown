@@ -244,7 +244,7 @@ func (m *Model) renderExecLogLine(line ExecLogLine, width int) string {
 func execStatusAccent(status string) color.Color {
 	switch {
 	case status == "running":
-		return lipgloss.Color("221")
+		return lipgloss.Color("180")
 	case strings.HasPrefix(status, "completed"):
 		return lipgloss.Color("42")
 	case strings.HasPrefix(status, "failed"):
