@@ -6,10 +6,7 @@ import (
 	"time"
 
 	lipgloss "charm.land/lipgloss/v2"
-	"github.com/charmbracelet/glamour"
 )
-
-var markdownRendererCache = map[int]*glamour.TermRenderer{}
 
 func (m *Model) render() string {
 	if m.width <= 0 || m.height <= 0 {
@@ -173,53 +170,9 @@ func (m *Model) renderMarkdownBody(height, width int) []string {
 		return m.mdCacheLines
 	}
 
-	if !m.useGlamour {
-		lines := m.markdownFallbackLines(start, height, width)
-		m.storeMarkdownCache(start, height, width, lines)
-		return lines
-	}
-
-	end := min(len(m.doc.Lines), start+height)
-	snippet := strings.Join(m.doc.Lines[start:end], "\n")
-
-	renderer, err := markdownRenderer(width)
-	if err != nil {
-		lines := m.markdownFallbackLines(start, height, width)
-		m.storeMarkdownCache(start, height, width, lines)
-		return lines
-	}
-
-	rendered, err := renderer.Render(snippet)
-	if err != nil {
-		lines := m.markdownFallbackLines(start, height, width)
-		m.storeMarkdownCache(start, height, width, lines)
-		return lines
-	}
-
-	lines := strings.Split(strings.TrimSuffix(rendered, "\n"), "\n")
-	if len(lines) > height {
-		lines = lines[:height]
-	}
-	for len(lines) < height {
-		lines = append(lines, "")
-	}
+	lines := m.markdownFallbackLines(start, height, width)
 	m.storeMarkdownCache(start, height, width, lines)
 	return lines
-}
-
-func markdownRenderer(width int) (*glamour.TermRenderer, error) {
-	if r, ok := markdownRendererCache[width]; ok {
-		return r, nil
-	}
-	r, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(width),
-	)
-	if err != nil {
-		return nil, err
-	}
-	markdownRendererCache[width] = r
-	return r, nil
 }
 
 func (m *Model) storeMarkdownCache(start, height, width int, lines []string) {
@@ -232,13 +185,14 @@ func (m *Model) storeMarkdownCache(start, height, width int, lines []string) {
 
 func (m *Model) markdownFallbackLines(start, height, width int) []string {
 	lines := make([]string, 0, height)
+	state := concealState{}
 	for row := 0; row < height; row++ {
 		lineIdx := start + row
 		if lineIdx >= len(m.doc.Lines) {
 			lines = append(lines, "")
 			continue
 		}
-		lines = append(lines, padLine(renderMarkdownLine(m.doc.Lines[lineIdx]), width))
+		lines = append(lines, padLine(concealMarkdownLine(m.doc.Lines[lineIdx], &state), width))
 	}
 	return lines
 }
@@ -270,18 +224,6 @@ func selectionPrefix(lineIdx, selStart, selEnd int, selected bool) string {
 	default:
 		return "┃ "
 	}
-}
-
-func renderMarkdownLine(line string) string {
-	trimmed := strings.TrimSpace(line)
-	if strings.HasPrefix(trimmed, "#") {
-		level := headingLevel(trimmed)
-		if level > 0 {
-			title := strings.TrimSpace(trimmed[level:])
-			return fmt.Sprintf("%s %s", strings.Repeat("•", level), title)
-		}
-	}
-	return line
 }
 
 func (m *Model) renderOutlinePane(width, height int) string {

@@ -27,9 +27,8 @@ type Model struct {
 	mdTop      int
 	outlineIdx int
 
-	collapsed  map[int]bool
-	execOnly   bool
-	useGlamour bool
+	collapsed map[int]bool
+	execOnly  bool
 
 	mdCacheStart     int
 	mdCacheHeight    int
@@ -68,7 +67,6 @@ func NewModel(doc Document, fileName string) *Model {
 		focus:           PaneMarkdown,
 		outlineIdx:      startIdx,
 		collapsed:       map[int]bool{},
-		useGlamour:      false,
 		execHistory:     map[int][]ExecRecord{},
 		execViewIndex:   map[int]int{},
 		execViewOutline: -1,
@@ -76,9 +74,7 @@ func NewModel(doc Document, fileName string) *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Tick(10*time.Millisecond, func(time.Time) tea.Msg {
-		return enableGlamourMsg{}
-	})
+	return nil
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -109,10 +105,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 	switch x := msg.(type) {
-	case enableGlamourMsg:
-		m.useGlamour = true
-		m.invalidateMarkdownCache()
-		return nil, true
 	case execLineMsg:
 		m.execLogs = append(m.execLogs, x.line)
 		if len(m.execLogs) > 2000 {
@@ -155,8 +147,6 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 		return nil, false
 	}
 }
-
-type enableGlamourMsg struct{}
 
 func (m *Model) invalidateMarkdownCache() {
 	m.mdCacheStart = 0

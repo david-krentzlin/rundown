@@ -222,19 +222,13 @@ func TestTabSwitchesPaneOnKeyPress(t *testing.T) {
 	}
 }
 
-func TestEnableGlamourMessageTurnsOnMarkdownRenderer(t *testing.T) {
+func TestModelInitDoesNotAutoExecute(t *testing.T) {
 	doc := ParseMarkdown("# A\ntext\n")
 	m := NewModel(doc, "test.md")
-	if m.useGlamour {
-		t.Fatal("expected glamour to be disabled initially")
-	}
-
-	m.Update(enableGlamourMsg{})
-	if !m.useGlamour {
-		t.Fatal("expected glamour to be enabled after async message")
-	}
+	_, cmd := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	_ = cmd
 	if m.execRunning {
-		t.Fatal("execution should not start from glamour enable message")
+		t.Fatal("execution should not start on init")
 	}
 	if len(m.execHistory) != 0 {
 		t.Fatal("execution history should be empty on load")
