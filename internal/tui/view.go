@@ -128,9 +128,7 @@ func (m *Model) renderLogPanel(height int) string {
 		rec = ExecRecord{Title: "none", Lang: "", Status: "idle"}
 	}
 	status := rec.Status
-	titleLine := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Render(
-		clipLine(fmt.Sprintf("exec: %s (%s)", rec.Title, rec.Lang), bodyW),
-	)
+	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
 	visible := max(1, height-4) // border top/bottom + title + meta
 	maxScroll := max(0, len(rec.Logs)-visible)
@@ -163,15 +161,56 @@ func (m *Model) renderLogPanel(height int) string {
 	return panel
 }
 
+func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) string {
+	progStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("230")).
+		Background(lipgloss.Color("24")).
+		Padding(0, 1)
+	runStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("236")).
+		Background(lipgloss.Color("186")).
+		Padding(0, 1)
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("230"))
+
+	program := execProgramName(rec)
+	if program == "" {
+		program = rec.Lang
+	}
+	left := progStyle.Render(strings.ToUpper(program))
+	right := ""
+	if total > 0 {
+		right = runStyle.Render(fmt.Sprintf("run %d/%d", current, total))
+	}
+
+	leftW := lipgloss.Width(left)
+	rightW := lipgloss.Width(right)
+	gap := 1
+	centerW := max(0, width-leftW-rightW-gap)
+	center := titleStyle.Render(clipLine(rec.Title, centerW))
+	line := left
+	if centerW > 0 {
+		line += " " + center
+	}
+	if right != "" {
+		padding := max(1, width-lipgloss.Width(line)-rightW)
+		line += strings.Repeat(" ", padding) + right
+	}
+	return clipLine(line, width)
+}
+
 func (m *Model) renderExecMetaLine(rec ExecRecord, current, total, width int) string {
-	runStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	statusStyle := lipgloss.NewStyle().Foreground(execStatusAccent(rec.Status))
+	statusStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("231")).
+		Background(execStatusAccent(rec.Status)).
+		Padding(0, 1)
 
 	parts := []string{}
-	if total > 0 {
-		parts = append(parts, runStyle.Render(fmt.Sprintf("run %d/%d", current, total)))
-	}
 	if rec.Command != "" {
 		parts = append(parts, cmdStyle.Render("$ "+rec.Command))
 	}
@@ -215,6 +254,18 @@ func execStatusAccent(status string) color.Color {
 	default:
 		return lipgloss.Color("244")
 	}
+}
+
+func execProgramName(rec ExecRecord) string {
+	cmd := strings.TrimSpace(rec.Command)
+	if cmd == "" {
+		return ""
+	}
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
 }
 
 func clipLine(s string, width int) string {
