@@ -22,7 +22,8 @@ func (m *Model) render() string {
 		parts = append(parts, m.renderLogPanel(m.logPanelHeight()))
 	}
 	parts = append(parts, footer)
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	content := lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return constrainViewport(content, m.width, m.height)
 }
 
 func (m *Model) renderHeader() string {
@@ -62,9 +63,8 @@ func (m *Model) renderFooter() string {
 }
 
 func (m *Model) renderLogPanel(height int) string {
-	bodyW := max(8, m.width-4)
-	bodyH := max(1, height-2)
-
+	panelW := max(8, m.width)
+	bodyW := max(1, panelW-4) // border + horizontal padding
 	title, logs, status, current, total := m.execPanelData()
 	header := fmt.Sprintf("%s | status: %s", title, status)
 	if total > 0 {
@@ -73,34 +73,34 @@ func (m *Model) renderLogPanel(height int) string {
 	if status == "running" {
 		header = fmt.Sprintf("%s | run %d/%d | status: running | elapsed: %s", title, current, total, time.Since(m.execStartedAt).Truncate(time.Second))
 	}
-	visible := max(0, bodyH-2)
+	visible := max(1, height-4) // border row + title row + bottom border row
 	maxScroll := max(0, len(logs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
 	start := m.execLogScroll
 	end := min(len(logs), start+visible)
-	lines := []string{
-		clipLine(header, bodyW),
-		strings.Repeat("─", max(1, bodyW)),
-	}
+	lines := make([]string, 0, visible)
 	for _, line := range logs[start:end] {
 		lines = append(lines, clipLine(line, bodyW))
 	}
-	for len(lines) < bodyH {
+	for len(lines) < visible {
 		lines = append(lines, strings.Repeat(" ", bodyW))
 	}
-	body := lipgloss.NewStyle().
-		Width(bodyW).
-		Height(bodyH).
-		Render(strings.Join(lines, "\n"))
+	content := strings.Join(lines, "\n")
 
-	borderColor := execBorderColor(status)
-
-	return lipgloss.NewStyle().
-		Width(m.width).
+	panel := lipgloss.NewStyle().
+		Width(panelW).
+		Height(height).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
+		BorderForeground(execBorderColor(status)).
 		Padding(0, 1).
-		Render(body)
+		Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				clipLine(header, bodyW),
+				lipgloss.NewStyle().Width(bodyW).Height(visible).Render(content),
+			),
+		)
+	return panel
 }
 
 func clipLine(s string, width int) string {
@@ -113,6 +113,23 @@ func clipLine(s string, width int) string {
 		return clipped
 	}
 	return clipped + strings.Repeat(" ", width-w)
+}
+
+func constrainViewport(content string, width, height int) string {
+	if width <= 0 || height <= 0 {
+		return ""
+	}
+	lines := strings.Split(content, "\n")
+	for i := range lines {
+		lines[i] = clipLine(lines[i], width)
+	}
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	for len(lines) < height {
+		lines = append(lines, strings.Repeat(" ", width))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func execBorderColor(status string) color.Color {
@@ -371,7 +388,11 @@ func iconForLang(lang string) string {
 }
 
 func (m *Model) execMetaBadge(idx int) string {
-	h := m.execHistory[idx]
+	if !m.validOutlineIndex(idx) {
+		return ""
+	}
+	blockID := m.doc.Outline[idx].ID
+	h := m.execHistory[blockID]
 	count := len(h)
 	runs := lipgloss.NewStyle().Foreground(lipgloss.Color("110")).Render(fmt.Sprintf("runs:%d", count))
 	if count == 0 {
@@ -381,7 +402,7 @@ func (m *Model) execMetaBadge(idx int) string {
 
 	statusColor := lipgloss.Color("244")
 	switch {
-	case m.execRunning && m.execRunOutlineIdx == idx:
+	case m.execRunning && m.execRunBlockID == blockID:
 		statusColor = lipgloss.Color("214")
 	case strings.HasPrefix(last.Status, "completed"):
 		statusColor = lipgloss.Color("42")
@@ -392,7 +413,7 @@ func (m *Model) execMetaBadge(idx int) string {
 	}
 	status := lipgloss.NewStyle().Foreground(statusColor).Render(last.Status)
 
-	if m.execRunning && m.execRunOutlineIdx == idx {
+	if m.execRunning && m.execRunBlockID == blockID {
 		return fmt.Sprintf("%s | %s", runs, status)
 	}
 	if last.Duration > 0 {
@@ -403,6 +424,9 @@ func (m *Model) execMetaBadge(idx int) string {
 }
 
 func (m *Model) execIndent(item OutlineItem) string {
+	if m.execOnly {
+		return ""
+	}
 	if item.Parent >= 0 && item.Parent < len(m.doc.Outline) {
 		parentLevel := m.doc.Outline[item.Parent].Level
 		return strings.Repeat("  ", max(0, parentLevel))

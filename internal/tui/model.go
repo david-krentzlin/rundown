@@ -44,11 +44,11 @@ type Model struct {
 	execStartedAt     time.Time
 	execCancel        context.CancelFunc
 	execMsgCh         chan tea.Msg
-	execRunOutlineIdx int
+	execRunBlockID    string
 
-	execHistory     map[int][]ExecRecord
-	execViewIndex   map[int]int
-	execViewOutline int
+	execHistory     map[string][]ExecRecord
+	execViewIndex   map[string]int
+	execViewBlockID string
 	execLogScroll   int
 }
 
@@ -67,9 +67,9 @@ func NewModel(doc Document, fileName string) *Model {
 		focus:           PaneOutline,
 		outlineIdx:      startIdx,
 		collapsed:       map[int]bool{},
-		execHistory:     map[int][]ExecRecord{},
-		execViewIndex:   map[int]int{},
-		execViewOutline: -1,
+		execHistory:     map[string][]ExecRecord{},
+		execViewIndex:   map[string]int{},
+		execViewBlockID: "",
 	}
 }
 
@@ -110,11 +110,11 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 		if len(m.execLogs) > 2000 {
 			m.execLogs = m.execLogs[len(m.execLogs)-2000:]
 		}
-		h := m.execHistory[m.execRunOutlineIdx]
+		h := m.execHistory[m.execRunBlockID]
 		if len(h) > 0 {
 			last := &h[len(h)-1]
 			last.Logs = append(last.Logs, x.line)
-			m.execHistory[m.execRunOutlineIdx] = h
+			m.execHistory[m.execRunBlockID] = h
 		}
 		if m.execRunning && m.execMsgCh != nil {
 			return waitExecEvent(m.execMsgCh), true
@@ -131,14 +131,14 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 			m.execStatus = fmt.Sprintf("completed (%d)", x.exitCode)
 		}
 		m.execLogs = append(m.execLogs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
-		h := m.execHistory[m.execRunOutlineIdx]
+		h := m.execHistory[m.execRunBlockID]
 		if len(h) > 0 {
 			last := &h[len(h)-1]
 			last.Duration = x.duration
 			last.ExitCode = x.exitCode
 			last.Logs = append(last.Logs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
 			last.Status = m.execStatus
-			m.execHistory[m.execRunOutlineIdx] = h
+			m.execHistory[m.execRunBlockID] = h
 		}
 		return nil, true
 	case execChannelClosedMsg:

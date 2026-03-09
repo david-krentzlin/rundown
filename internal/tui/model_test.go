@@ -292,6 +292,56 @@ func TestCtrlAAndCtrlENavigateDocument(t *testing.T) {
 	}
 }
 
+func TestExecHistoryAssociatesByBlockID(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho a\n```\n# B\n```bash\necho b\n```\n")
+	m := NewModel(doc, "test.md")
+	m.SetViewport(80, 20)
+
+	var firstExec, secondExec int
+	firstExec, secondExec = -1, -1
+	for i, item := range m.doc.Outline {
+		if item.Kind != NodeExec {
+			continue
+		}
+		if firstExec < 0 {
+			firstExec = i
+		} else {
+			secondExec = i
+			break
+		}
+	}
+	if firstExec < 0 || secondExec < 0 {
+		t.Fatalf("expected two executable blocks, got first=%d second=%d", firstExec, secondExec)
+	}
+
+	firstID := m.doc.Outline[firstExec].ID
+	secondID := m.doc.Outline[secondExec].ID
+	m.execHistory[firstID] = []ExecRecord{{Title: "first", Lang: "bash", Status: "completed (0)", Logs: []string{"first log"}}}
+	m.execHistory[secondID] = []ExecRecord{{Title: "second", Lang: "bash", Status: "failed (1)", Logs: []string{"second log"}}}
+	m.execViewIndex[firstID] = 0
+	m.execViewIndex[secondID] = 0
+
+	// Reorder outline items to emulate index instability.
+	m.doc.Outline[firstExec], m.doc.Outline[secondExec] = m.doc.Outline[secondExec], m.doc.Outline[firstExec]
+
+	// Select the block that originally had secondID and ensure we get second log.
+	selectedIdx := m.outlineIndexByID(secondID)
+	if selectedIdx < 0 {
+		t.Fatalf("expected to find outline item by id %q after reorder", secondID)
+	}
+	m.outlineIdx = selectedIdx
+	title, logs, status, current, total := m.execPanelData()
+	if !strings.Contains(title, "second") {
+		t.Fatalf("title = %q, want contains second", title)
+	}
+	if len(logs) != 1 || logs[0] != "second log" {
+		t.Fatalf("logs = %v, want [second log]", logs)
+	}
+	if status != "failed (1)" || current != 1 || total != 1 {
+		t.Fatalf("status/current/total = %q/%d/%d, want failed (1)/1/1", status, current, total)
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0

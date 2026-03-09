@@ -14,6 +14,7 @@ const (
 )
 
 type OutlineItem struct {
+	ID      string
 	Title   string
 	Level   int
 	Line    int
@@ -53,6 +54,7 @@ func ParseMarkdown(src string) Document {
 				title := strings.TrimSpace(trimmed[level:])
 				parent := nearestHeadingParent(headingAtLevel, level)
 				outline = append(outline, OutlineItem{
+					ID:      outlineID(NodeHeading, lineNo, len(outline)),
 					Title:   title,
 					Level:   level,
 					Line:    lineNo,
@@ -87,6 +89,7 @@ func ParseMarkdown(src string) Document {
 			}
 			parent := nearestHeadingParent(headingAtLevel, 7)
 			outline = append(outline, OutlineItem{
+				ID:      outlineID(NodeExec, lineNo, len(outline)),
 				Title:   fmt.Sprintf("%s block", lang),
 				Level:   7,
 				Line:    lineNo,
@@ -174,4 +177,8 @@ func nearestHeadingParent(levelIdx map[int]int, level int) int {
 		}
 	}
 	return -1
+}
+
+func outlineID(kind NodeKind, lineNo, ordinal int) string {
+	return fmt.Sprintf("%d:%d:%d", kind, lineNo, ordinal)
 }

@@ -70,7 +70,7 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 	m.execLogs = []string{fmt.Sprintf("$ %s %s", name, strings.Join(args, " "))}
 	m.execStatus = "running"
 	m.execMsgCh = make(chan tea.Msg, 1024)
-	m.execRunOutlineIdx = m.outlineIdx
+	m.execRunBlockID = item.ID
 
 	record := ExecRecord{
 		Title:   item.Title,
@@ -80,9 +80,9 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 		Status:  "running",
 		Logs:    append([]string{}, m.execLogs...),
 	}
-	m.execHistory[m.execRunOutlineIdx] = append(m.execHistory[m.execRunOutlineIdx], record)
-	m.execViewIndex[m.execRunOutlineIdx] = len(m.execHistory[m.execRunOutlineIdx]) - 1
-	m.execViewOutline = m.execRunOutlineIdx
+	m.execHistory[m.execRunBlockID] = append(m.execHistory[m.execRunBlockID], record)
+	m.execViewIndex[m.execRunBlockID] = len(m.execHistory[m.execRunBlockID]) - 1
+	m.execViewBlockID = m.execRunBlockID
 	m.execLogScroll = 0
 
 	go streamExecPipe(stdout, m.execMsgCh)

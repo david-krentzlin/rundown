@@ -25,4 +25,9 @@ func TestParseMarkdownBuildsOutlineWithHeadingsAndExecBlocks(t *testing.T) {
 	if doc.Outline[4].Kind != NodeExec || doc.Outline[4].Lang != "python" {
 		t.Fatalf("expected python exec node at index 4, got %#v", doc.Outline[4])
 	}
+	for i, item := range doc.Outline {
+		if item.ID == "" {
+			t.Fatalf("outline[%d] id is empty", i)
+		}
+	}
 }
