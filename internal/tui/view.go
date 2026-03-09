@@ -133,7 +133,7 @@ func (m *Model) renderLogPanel(height int) string {
 	status := rec.Status
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, bodyW)
-	visible := max(1, height-5) // border top/bottom + pane header/title + meta
+	visible := max(1, height-6) // border top/bottom + pane header+divider + title + meta
 	renderedLogs := m.visibleExecLogs(rec)
 	maxScroll := max(0, len(renderedLogs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
@@ -363,7 +363,7 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 	active := m.focus == PaneMarkdown
 	bodyW := max(8, width-4)
 	bodyH := max(1, height-2)
-	contentH := max(1, bodyH-2)
+	contentH := max(1, bodyH-3)
 
 	markdown := m.renderMarkdown(contentH, bodyW)
 	header := m.renderPaneHeader(bodyW, "markdown", active)
@@ -482,7 +482,7 @@ func (m *Model) renderOutlinePane(width, height int) string {
 	active := m.focus == PaneOutline
 	bodyW := max(8, width-4)
 	bodyH := max(1, height-2)
-	contentH := max(1, bodyH-2)
+	contentH := max(1, bodyH-3)
 	header := m.renderPaneHeader(bodyW, "outline", active)
 	lines := m.renderOutlineLines(contentH, bodyW)
 	content := lipgloss.NewStyle().
@@ -540,7 +540,19 @@ func (m *Model) renderPaneHeader(width int, label string, active bool) string {
 	right := markerStyle.Render(marker)
 	padding := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
 	line := left + strings.Repeat(" ", padding) + right
-	return barStyle.Render(clipLine(line, width))
+	dividerColor := lipgloss.Color("239")
+	if active {
+		dividerColor = lipgloss.Color("60")
+	}
+	divider := lipgloss.NewStyle().
+		Width(width).
+		Foreground(dividerColor).
+		Render(strings.Repeat("─", width))
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		barStyle.Render(clipLine(line, width)),
+		divider,
+	)
 }
 
 func (m *Model) renderOutlineLines(height, width int) []string {
