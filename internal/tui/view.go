@@ -285,14 +285,9 @@ func (m *Model) renderOutlineItem(idx int, item OutlineItem) string {
 	}
 
 	if item.Kind == NodeExec {
-		count := m.execCount(idx)
-		runBadge := ""
-		if count > 0 {
-			runBadge = fmt.Sprintf(" [%d]", count)
-		}
-		summary := m.execSummary(idx)
+		meta := m.execMetaBadge(idx)
 		indent := m.execIndent(item)
-		line := fmt.Sprintf("%s %s%s %s%s%s", cursorStyle.Render(cursor), indent, iconForLang(item.Lang), item.Title, runBadge, summary)
+		line := fmt.Sprintf("%s %s%s %s %s", cursorStyle.Render(cursor), indent, iconForLang(item.Lang), item.Title, meta)
 		if idx == m.outlineIdx {
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Render(line)
 		}
@@ -346,19 +341,36 @@ func iconForLang(lang string) string {
 	}
 }
 
-func (m *Model) execSummary(idx int) string {
+func (m *Model) execMetaBadge(idx int) string {
 	h := m.execHistory[idx]
-	if len(h) == 0 {
-		return ""
+	count := len(h)
+	runs := lipgloss.NewStyle().Foreground(lipgloss.Color("110")).Render(fmt.Sprintf("runs:%d", count))
+	if count == 0 {
+		return runs
 	}
 	last := h[len(h)-1]
+
+	statusColor := lipgloss.Color("244")
+	switch {
+	case m.execRunning && m.execRunOutlineIdx == idx:
+		statusColor = lipgloss.Color("214")
+	case strings.HasPrefix(last.Status, "completed"):
+		statusColor = lipgloss.Color("42")
+	case strings.HasPrefix(last.Status, "failed"):
+		statusColor = lipgloss.Color("196")
+	case strings.HasPrefix(last.Status, "killed"):
+		statusColor = lipgloss.Color("208")
+	}
+	status := lipgloss.NewStyle().Foreground(statusColor).Render(last.Status)
+
 	if m.execRunning && m.execRunOutlineIdx == idx {
-		return " {running}"
+		return fmt.Sprintf("%s | %s", runs, status)
 	}
 	if last.Duration > 0 {
-		return fmt.Sprintf(" {%s, %s}", last.Status, last.Duration.Truncate(time.Millisecond))
+		d := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(last.Duration.Truncate(time.Millisecond).String())
+		return fmt.Sprintf("%s | %s | %s", runs, status, d)
 	}
-	return fmt.Sprintf(" {%s}", last.Status)
+	return fmt.Sprintf("%s | %s", runs, status)
 }
 
 func (m *Model) execIndent(item OutlineItem) string {

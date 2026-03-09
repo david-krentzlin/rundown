@@ -207,18 +207,18 @@ func TestTabSwitchesPaneOnKeyPress(t *testing.T) {
 	doc := ParseMarkdown("# A\n")
 	m := NewModel(doc, "test.md")
 
-	if m.focus != PaneMarkdown {
-		t.Fatalf("initial focus = %v, want markdown", m.focus)
+	if m.focus != PaneOutline {
+		t.Fatalf("initial focus = %v, want outline", m.focus)
 	}
 
 	m.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	if m.focus != PaneOutline {
-		t.Fatalf("focus after tab key press = %v, want outline", m.focus)
+	if m.focus != PaneMarkdown {
+		t.Fatalf("focus after tab key press = %v, want markdown", m.focus)
 	}
 
 	m.handleKey("ctrl+i")
-	if m.focus != PaneMarkdown {
-		t.Fatalf("focus after ctrl+i key press = %v, want markdown", m.focus)
+	if m.focus != PaneOutline {
+		t.Fatalf("focus after ctrl+i key press = %v, want outline", m.focus)
 	}
 }
 
