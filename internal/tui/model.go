@@ -14,6 +14,7 @@ type Pane int
 const (
 	PaneMarkdown Pane = iota
 	PaneOutline
+	PaneLog
 )
 
 type Model struct {
@@ -189,7 +190,11 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 	if m.focus == PaneMarkdown {
 		m.handleMarkdownKey(key)
 		return false, nil
-	} else {
+	}
+	if m.focus == PaneLog {
+		return false, nil
+	}
+	{
 		cmd := m.handleOutlineKey(key)
 		return false, cmd
 	}
@@ -200,7 +205,7 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 		return m.handleHelpOverlayKey(key)
 	}
 
-	if quit, cmd, handled := m.handleGlobalExecPanelKey(key); handled {
+	if quit, cmd, handled := m.handleLogPanelKey(key); handled {
 		return quit, cmd, handled
 	}
 
@@ -224,11 +229,7 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 		m.toggleExecPanel()
 		return false, nil, true
 	case "tab", "ctrl+i":
-		if m.focus == PaneMarkdown {
-			m.focus = PaneOutline
-		} else {
-			m.focus = PaneMarkdown
-		}
+		m.cycleFocus()
 		return false, nil, true
 	default:
 		return false, nil, false
@@ -248,7 +249,10 @@ func (m *Model) handleHelpOverlayKey(key string) (bool, tea.Cmd, bool) {
 	}
 }
 
-func (m *Model) handleGlobalExecPanelKey(key string) (bool, tea.Cmd, bool) {
+func (m *Model) handleLogPanelKey(key string) (bool, tea.Cmd, bool) {
+	if m.focus != PaneLog || !m.execPanelVisible {
+		return false, nil, false
+	}
 	switch key {
 	case "[":
 		m.execPrevRecord()
@@ -274,6 +278,23 @@ func (m *Model) handleGlobalExecPanelKey(key string) (bool, tea.Cmd, bool) {
 		return false, nil, true
 	default:
 		return false, nil, false
+	}
+}
+
+func (m *Model) cycleFocus() {
+	switch m.focus {
+	case PaneOutline:
+		if m.execPanelVisible {
+			m.focus = PaneLog
+			return
+		}
+		m.focus = PaneMarkdown
+	case PaneLog:
+		m.focus = PaneMarkdown
+	case PaneMarkdown:
+		m.focus = PaneOutline
+	default:
+		m.focus = PaneOutline
 	}
 }
 

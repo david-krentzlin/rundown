@@ -31,8 +31,11 @@ func (m *Model) render() string {
 
 func (m *Model) renderHeader() string {
 	focus := "markdown"
-	if m.focus == PaneOutline {
+	switch m.focus {
+	case PaneOutline:
 		focus = "outline"
+	case PaneLog:
+		focus = "log"
 	}
 	text := fmt.Sprintf("rundown  %s  focus:%s  line:%d/%d", m.fileName, focus, m.cursorLine+1, max(1, len(m.doc.Lines)))
 	style := lipgloss.NewStyle().
@@ -130,7 +133,7 @@ func (m *Model) renderLogPanel(height int) string {
 	status := rec.Status
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
-	hintLine := m.renderPaneHint(bodyW, m.execPanelVisible, "[ ] runs  PgUp/PgDn scroll  Home/End jump")
+	hintLine := m.renderPaneHint(bodyW, m.focus == PaneLog, "[ prev run  ] next run  PgUp/PgDn scroll  Home/End jump  v close")
 	visible := max(1, height-5) // border top/bottom + title + meta + hint
 	renderedLogs := m.visibleExecLogs(rec)
 	maxScroll := max(0, len(renderedLogs)-visible)
@@ -146,11 +149,15 @@ func (m *Model) renderLogPanel(height int) string {
 	}
 	content := strings.Join(lines, "\n")
 
+	borderColor := execBorderColor(status)
+	if m.focus == PaneLog {
+		borderColor = lipgloss.Color("117")
+	}
 	panel := lipgloss.NewStyle().
 		Width(panelW).
 		Height(height).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(execBorderColor(status)).
+		BorderForeground(borderColor).
 		Padding(0, 1).
 		Render(
 			lipgloss.JoinVertical(
@@ -186,6 +193,11 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		Foreground(lipgloss.Color("236")).
 		Background(lipgloss.Color("186")).
 		Padding(0, 1)
+	focusStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("232")).
+		Background(lipgloss.Color("117")).
+		Padding(0, 1)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("230"))
@@ -195,10 +207,14 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		program = rec.Lang
 	}
 	left := progStyle.Render(strings.ToUpper(program))
-	right := ""
-	if total > 0 {
-		right = runStyle.Render(fmt.Sprintf("run %d/%d", current, total))
+	rightParts := make([]string, 0, 2)
+	if m.focus == PaneLog {
+		rightParts = append(rightParts, focusStyle.Render("LOG"))
 	}
+	if total > 0 {
+		rightParts = append(rightParts, runStyle.Render(fmt.Sprintf("run %d/%d", current, total)))
+	}
+	right := strings.Join(rightParts, " ")
 
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)
@@ -348,9 +364,10 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 	active := m.focus == PaneMarkdown
 	bodyW := max(8, width-4)
 	bodyH := max(1, height-2)
-	contentH := max(1, bodyH-1)
+	contentH := max(1, bodyH-2)
 
 	markdown := m.renderMarkdown(contentH, bodyW)
+	header := m.renderPaneHeader(bodyW, "markdown", active)
 	content := lipgloss.NewStyle().
 		Width(bodyW).
 		Height(contentH).
@@ -358,7 +375,7 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 		MaxWidth(bodyW).
 		Render(markdown)
 	hint := m.renderPaneHint(bodyW, active, "j/k move  J next heading  K prev  H parent  L child  mouse scroll")
-	body := lipgloss.JoinVertical(lipgloss.Left, content, hint)
+	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
 	if active {
@@ -466,14 +483,15 @@ func (m *Model) renderOutlinePane(width, height int) string {
 	active := m.focus == PaneOutline
 	bodyW := max(8, width-4)
 	bodyH := max(1, height-2)
-	contentH := max(1, bodyH-1)
+	contentH := max(1, bodyH-2)
+	header := m.renderPaneHeader(bodyW, "outline", active)
 	lines := m.renderOutlineLines(contentH, bodyW)
 	content := lipgloss.NewStyle().
 		Width(bodyW).
 		Height(contentH).
 		Render(strings.Join(lines, "\n"))
 	hint := m.renderPaneHint(bodyW, active, "j/k move  c/C collapse  e/E expand  x execs  r run  s stop")
-	body := lipgloss.JoinVertical(lipgloss.Left, content, hint)
+	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
 	if active {
@@ -495,6 +513,21 @@ func (m *Model) renderPaneHint(width int, active bool, text string) string {
 		style = style.Foreground(lipgloss.Color("250"))
 	}
 	return style.Render(clipLine(text, width))
+}
+
+func (m *Model) renderPaneHeader(width int, label string, active bool) string {
+	labelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
+	markerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("240"))
+	marker := "○"
+	if active {
+		labelStyle = labelStyle.Foreground(lipgloss.Color("230"))
+		markerStyle = markerStyle.Foreground(lipgloss.Color("117"))
+		marker = "◉"
+	}
+	left := labelStyle.Render(label)
+	right := markerStyle.Render(marker)
+	padding := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
+	return clipLine(left+strings.Repeat(" ", padding)+right, width)
 }
 
 func (m *Model) renderOutlineLines(height, width int) []string {

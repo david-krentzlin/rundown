@@ -2,6 +2,9 @@ package tui
 
 func (m *Model) toggleExecPanel() {
 	m.execPanelVisible = !m.execPanelVisible
+	if !m.execPanelVisible && m.focus == PaneLog {
+		m.focus = PaneOutline
+	}
 }
 
 func (m *Model) panelOutline() int {

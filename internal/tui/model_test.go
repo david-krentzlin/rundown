@@ -222,6 +222,25 @@ func TestTabSwitchesPaneOnKeyPress(t *testing.T) {
 	}
 }
 
+func TestTabCyclesThroughLogPanelWhenVisible(t *testing.T) {
+	doc := ParseMarkdown("# A\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+
+	m.handleKey("tab")
+	if m.focus != PaneLog {
+		t.Fatalf("focus after first tab = %v, want log", m.focus)
+	}
+	m.handleKey("tab")
+	if m.focus != PaneMarkdown {
+		t.Fatalf("focus after second tab = %v, want markdown", m.focus)
+	}
+	m.handleKey("tab")
+	if m.focus != PaneOutline {
+		t.Fatalf("focus after third tab = %v, want outline", m.focus)
+	}
+}
+
 func TestModelInitDoesNotAutoExecute(t *testing.T) {
 	doc := ParseMarkdown("# A\ntext\n")
 	m := NewModel(doc, "test.md")
@@ -431,6 +450,7 @@ func TestManualScrollUpDisablesTailFollow(t *testing.T) {
 	m.execPanelVisible = true
 	m.SetViewport(80, 24)
 	m.execFollowTail = true
+	m.focus = PaneLog
 
 	m.handleKey("pgup")
 	if m.execFollowTail {
@@ -439,6 +459,43 @@ func TestManualScrollUpDisablesTailFollow(t *testing.T) {
 	m.handleKey("end")
 	if !m.execFollowTail {
 		t.Fatal("expected end to re-enable log tail follow mode")
+	}
+}
+
+func TestLogPanelKeysRequireLogFocus(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.SetViewport(80, 24)
+
+	execIdx := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind == NodeExec {
+			execIdx = i
+			break
+		}
+	}
+	if execIdx < 0 {
+		t.Fatal("expected executable block")
+	}
+	blockID := m.doc.Outline[execIdx].ID
+	m.execHistory[blockID] = []ExecRecord{
+		{Title: "bash block", Lang: "bash", Status: "completed (0)"},
+		{Title: "bash block", Lang: "bash", Status: "completed (0)"},
+	}
+	m.execViewIndex[blockID] = 1
+	m.outlineIdx = execIdx
+	m.focus = PaneOutline
+
+	m.handleKey("[")
+	if got := m.execViewIndex[blockID]; got != 1 {
+		t.Fatalf("exec view index changed without log focus: got %d want 1", got)
+	}
+
+	m.focus = PaneLog
+	m.handleKey("[")
+	if got := m.execViewIndex[blockID]; got != 0 {
+		t.Fatalf("exec view index with log focus = %d, want 0", got)
 	}
 }
 
