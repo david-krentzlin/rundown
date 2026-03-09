@@ -64,7 +64,7 @@ func NewModel(doc Document, fileName string) *Model {
 	return &Model{
 		doc:             doc,
 		fileName:        fileName,
-		focus:           PaneMarkdown,
+		focus:           PaneOutline,
 		outlineIdx:      startIdx,
 		collapsed:       map[int]bool{},
 		execHistory:     map[int][]ExecRecord{},
