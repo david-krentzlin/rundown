@@ -224,7 +224,14 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 			Padding(0, 1).
 			Render(execStatusLabel(rec, m.execStartedAt)))
 	}
-	rightParts = append(rightParts, helpStyle.Render("r rerun  [/] runs  PgUp/PgDn  Home/End  Ctrl+X stop  v"))
+	rightParts = append(rightParts, helpStyle.Render(m.renderHintBubbles(
+		m.focus == PaneLog,
+		"[r] rerun",
+		"[/] runs",
+		"[PgUp/Dn] scroll",
+		"[C-x] stop",
+		"[?] help",
+	)))
 	right := strings.Join(rightParts, " ")
 
 	leftW := lipgloss.Width(left)
@@ -379,7 +386,13 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 		MaxHeight(contentH).
 		MaxWidth(bodyW).
 		Render(markdown)
-	hint := m.renderPaneHint(bodyW, active, "j/k move  J/K headings  H/L tree  Ctrl+A/E top/end  mouse scroll")
+	hint := m.renderPaneHint(bodyW, active,
+		"[j] down",
+		"[k] up",
+		"[J/K] headings",
+		"[C-a/e] top/end",
+		"[?] help",
+	)
 	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
@@ -495,7 +508,14 @@ func (m *Model) renderOutlinePane(width, height int) string {
 		Width(bodyW).
 		Height(contentH).
 		Render(strings.Join(lines, "\n"))
-	hint := m.renderPaneHint(bodyW, active, "j/k move  c/C collapse  e/E expand  n/p execs  r run  s stop")
+	hint := m.renderPaneHint(bodyW, active,
+		"[j] down",
+		"[k] up",
+		"[c/e] fold",
+		"[x] blocks",
+		"[r] run",
+		"[?] help",
+	)
 	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
@@ -510,14 +530,37 @@ func (m *Model) renderOutlinePane(width, height int) string {
 		Render(body)
 }
 
-func (m *Model) renderPaneHint(width int, active bool, text string) string {
-	style := lipgloss.NewStyle().
-		Width(width).
-		Foreground(lipgloss.Color("243"))
+func (m *Model) renderPaneHint(width int, active bool, items ...string) string {
+	style := lipgloss.NewStyle().Width(width)
+	return style.Render(clipLine(m.renderHintBubbles(active, items...), width))
+}
+
+func (m *Model) renderHintBubbles(active bool, items ...string) string {
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("232")).
+		Background(lipgloss.Color("245")).
+		Padding(0, 1)
+	textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("239"))
 	if active {
-		style = style.Foreground(lipgloss.Color("250"))
+		keyStyle = keyStyle.
+			Background(lipgloss.Color("252")).
+			Bold(true)
+		textStyle = textStyle.Foreground(lipgloss.Color("247"))
+		sepStyle = sepStyle.Foreground(lipgloss.Color("241"))
 	}
-	return style.Render(clipLine(text, width))
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		key, rest, found := strings.Cut(item, "]")
+		if found && strings.HasPrefix(key, "[") {
+			keyText := strings.TrimPrefix(key, "[")
+			label := strings.TrimSpace(rest)
+			parts = append(parts, keyStyle.Render(keyText)+" "+textStyle.Render(label))
+			continue
+		}
+		parts = append(parts, textStyle.Render(item))
+	}
+	return strings.Join(parts, sepStyle.Render(" • "))
 }
 
 func (m *Model) renderPaneHeader(width int, label string, active bool) string {
