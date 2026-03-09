@@ -133,7 +133,7 @@ func (m *Model) renderLogPanel(height int) string {
 	status := rec.Status
 	titleLine := m.renderExecTitleLine(rec, current, total, bodyW)
 	metaLine := m.renderExecMetaLine(rec, bodyW)
-	visible := max(1, height-4) // border top/bottom + title + meta
+	visible := max(1, height-5) // border top/bottom + pane header/title + meta
 	renderedLogs := m.visibleExecLogs(rec)
 	maxScroll := max(0, len(renderedLogs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
@@ -191,11 +191,6 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		Foreground(lipgloss.Color("236")).
 		Background(lipgloss.Color("186")).
 		Padding(0, 1)
-	labelStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("232")).
-		Background(lipgloss.Color("117")).
-		Padding(0, 1)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("230"))
@@ -204,16 +199,13 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		helpStyle = helpStyle.Foreground(lipgloss.Color("249"))
 	}
 
+	header := m.renderPaneHeader(width, "log", m.focus == PaneLog)
 	program := execProgramName(rec)
 	if program == "" {
 		program = rec.Lang
 	}
 	left := progStyle.Render(strings.ToUpper(program))
-	centerParts := []string{titleStyle.Render(rec.Title)}
-	if m.focus == PaneLog {
-		centerParts = append(centerParts, labelStyle.Render("LOG"))
-	}
-	center := strings.Join(centerParts, " ")
+	center := titleStyle.Render(rec.Title)
 	rightParts := make([]string, 0, 3)
 	if total > 0 {
 		rightParts = append(rightParts, runStyle.Render(fmt.Sprintf("run %d/%d", current, total)))
@@ -242,7 +234,7 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 		padding := max(1, width-lipgloss.Width(line)-rightW)
 		line += strings.Repeat(" ", padding) + right
 	}
-	return clipLine(line, width)
+	return lipgloss.JoinVertical(lipgloss.Left, header, clipLine(line, width))
 }
 
 func (m *Model) renderExecMetaLine(rec ExecRecord, width int) string {
