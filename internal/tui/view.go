@@ -82,8 +82,10 @@ func (m *Model) renderHelpOverlay() string {
 		sectionStyle.Render("Global"),
 		bodyStyle.Render("  ?        toggle this help"),
 		bodyStyle.Render("  tab      switch pane focus"),
+		bodyStyle.Render("  v        show/hide log panel"),
 		bodyStyle.Render("  Ctrl+A   jump to document top"),
 		bodyStyle.Render("  Ctrl+E   jump to document bottom"),
+		bodyStyle.Render("  Ctrl+X   stop running command"),
 		bodyStyle.Render("  Ctrl+C/Q quit (stops running commands)"),
 		"",
 		sectionStyle.Render("Markdown pane"),
@@ -91,6 +93,7 @@ func (m *Model) renderHelpOverlay() string {
 		bodyStyle.Render("  h/l      fallback left/right navigation"),
 		bodyStyle.Render("  J/K      next/previous heading"),
 		bodyStyle.Render("  H/L      parent/first child heading"),
+		bodyStyle.Render("  Ctrl+A/E jump to top/bottom"),
 		bodyStyle.Render("  mouse    wheel scroll (left pane)"),
 		"",
 		sectionStyle.Render("Outline pane"),
@@ -101,13 +104,16 @@ func (m *Model) renderHelpOverlay() string {
 		bodyStyle.Render("  n/p      next/previous executable"),
 		bodyStyle.Render("  r        run selected executable"),
 		bodyStyle.Render("  s        stop running command"),
+		bodyStyle.Render("  Ctrl+A/E jump to top/bottom"),
 		"",
 		sectionStyle.Render("Execution panel"),
+		bodyStyle.Render("  r        rerun selected executable"),
 		bodyStyle.Render("  v        show/hide panel"),
 		bodyStyle.Render("  [/]      previous/next run for selected block"),
 		bodyStyle.Render("  PgUp/Dn  scroll logs"),
 		bodyStyle.Render("  Ctrl+U/D scroll logs"),
 		bodyStyle.Render("  Home/End jump to top/bottom logs"),
+		bodyStyle.Render("  Ctrl+X   stop running command"),
 		bodyStyle.Render("  mouse    wheel scroll (over log panel)"),
 		"",
 		noteStyle.Render("Press ? or Esc to close help."),
@@ -218,7 +224,7 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 			Padding(0, 1).
 			Render(execStatusLabel(rec, m.execStartedAt)))
 	}
-	rightParts = append(rightParts, helpStyle.Render("r rerun  [/] runs  PgUp/PgDn  Home/End  v"))
+	rightParts = append(rightParts, helpStyle.Render("r rerun  [/] runs  PgUp/PgDn  Home/End  Ctrl+X stop  v"))
 	right := strings.Join(rightParts, " ")
 
 	leftW := lipgloss.Width(left)
@@ -373,7 +379,7 @@ func (m *Model) renderMarkdownPane(width, height int) string {
 		MaxHeight(contentH).
 		MaxWidth(bodyW).
 		Render(markdown)
-	hint := m.renderPaneHint(bodyW, active, "j/k move  J next heading  K prev  H parent  L child  mouse scroll")
+	hint := m.renderPaneHint(bodyW, active, "j/k move  J/K headings  H/L tree  Ctrl+A/E top/end  mouse scroll")
 	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
@@ -489,7 +495,7 @@ func (m *Model) renderOutlinePane(width, height int) string {
 		Width(bodyW).
 		Height(contentH).
 		Render(strings.Join(lines, "\n"))
-	hint := m.renderPaneHint(bodyW, active, "j/k move  c/C collapse  e/E expand  x execs  r run  s stop")
+	hint := m.renderPaneHint(bodyW, active, "j/k move  c/C collapse  e/E expand  n/p execs  r run  s stop")
 	body := lipgloss.JoinVertical(lipgloss.Left, header, content, hint)
 
 	borderColor := lipgloss.Color("240")
