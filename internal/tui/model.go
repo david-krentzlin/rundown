@@ -40,7 +40,7 @@ type Model struct {
 	execRunning       bool
 	execStatus        string
 	execTitle         string
-	execLogs          []string
+	execLogs          []ExecLogLine
 	execStartedAt     time.Time
 	execCancel        context.CancelFunc
 	execMsgCh         chan tea.Msg
@@ -109,14 +109,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 	switch x := msg.(type) {
 	case execLineMsg:
-		m.execLogs = append(m.execLogs, x.line)
+		line := ExecLogLine{Text: x.line, Stream: x.stream, Kind: "output"}
+		m.execLogs = append(m.execLogs, line)
 		if len(m.execLogs) > 2000 {
 			m.execLogs = m.execLogs[len(m.execLogs)-2000:]
 		}
 		h := m.execHistory[m.execRunBlockID]
 		if len(h) > 0 {
 			last := &h[len(h)-1]
-			last.Logs = append(last.Logs, x.line)
+			last.Logs = append(last.Logs, line)
 			m.execHistory[m.execRunBlockID] = h
 		}
 		if m.execFollowTail && m.execRunning && m.isViewingActiveRun() {
@@ -137,13 +138,17 @@ func (m *Model) handleInternalMsg(msg tea.Msg) (tea.Cmd, bool) {
 		default:
 			m.execStatus = fmt.Sprintf("completed (%d)", x.exitCode)
 		}
-		m.execLogs = append(m.execLogs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
+		doneLine := ExecLogLine{
+			Text: fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)),
+			Kind: "result",
+		}
+		m.execLogs = append(m.execLogs, doneLine)
 		h := m.execHistory[m.execRunBlockID]
 		if len(h) > 0 {
 			last := &h[len(h)-1]
 			last.Duration = x.duration
 			last.ExitCode = x.exitCode
-			last.Logs = append(last.Logs, fmt.Sprintf("[done] status=%s duration=%s", m.execStatus, x.duration.Truncate(time.Millisecond)))
+			last.Logs = append(last.Logs, doneLine)
 			last.Status = m.execStatus
 			m.execHistory[m.execRunBlockID] = h
 		}

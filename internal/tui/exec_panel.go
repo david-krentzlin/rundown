@@ -1,7 +1,5 @@
 package tui
 
-import "fmt"
-
 func (m *Model) toggleExecPanel() {
 	m.execPanelVisible = !m.execPanelVisible
 }
@@ -80,29 +78,30 @@ func (m *Model) execScroll(delta int) {
 	if delta < 0 {
 		m.execFollowTail = false
 	}
-	_, logs, _, _, _ := m.execPanelData()
-	maxScroll := max(0, len(logs)-max(1, m.logPanelHeight()-3))
+	rec, _, _, ok := m.execPanelData()
+	if !ok {
+		return
+	}
+	maxScroll := max(0, len(rec.Logs)-max(1, m.logPanelHeight()-4))
 	m.execLogScroll = clamp(m.execLogScroll+delta, 0, maxScroll)
 	if m.execLogScroll >= maxScroll {
 		m.execFollowTail = true
 	}
 }
 
-func (m *Model) execPanelData() (string, []string, string, int, int) {
+func (m *Model) execPanelData() (ExecRecord, int, int, bool) {
 	outline := m.panelOutline()
 	if outline < 0 {
-		return "exec: none", nil, "idle", 0, 0
+		return ExecRecord{}, 0, 0, false
 	}
 	blockID := m.doc.Outline[outline].ID
 	m.ensureExecViewIndex(blockID)
 	history := m.execHistory[blockID]
 	if len(history) == 0 {
-		return "exec: none", nil, "idle", 0, 0
+		return ExecRecord{}, 0, 0, false
 	}
 	idx := m.execViewIndex[blockID]
-	rec := history[idx]
-	title := fmt.Sprintf("exec: %s (%s)", rec.Title, rec.Lang)
-	return title, rec.Logs, rec.Status, idx + 1, len(history)
+	return history[idx], idx + 1, len(history), true
 }
 
 func (m *Model) outlineIndexByID(blockID string) int {

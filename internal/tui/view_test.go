@@ -81,11 +81,11 @@ func TestRenderLogPanelKeepsFixedHeightWhenScrollable(t *testing.T) {
 	}
 	blockID := m.doc.Outline[execIdx].ID
 
-	logs := make([]string, 0, 40)
+	logs := make([]ExecLogLine, 0, 40)
 	for i := 0; i < 40; i++ {
-		logs = append(logs, fmt.Sprintf("log-%02d %s", i, strings.Repeat("x", 120)))
+		logs = append(logs, ExecLogLine{Text: fmt.Sprintf("log-%02d %s", i, strings.Repeat("x", 120)), Kind: "output"})
 	}
-	logs[5] = "first line\nsecond line that must not expand panel rows"
+	logs[5] = ExecLogLine{Text: "first line\nsecond line that must not expand panel rows", Kind: "output"}
 	m.execHistory[blockID] = []ExecRecord{{
 		Title:  "bash block",
 		Lang:   "bash",
@@ -106,5 +106,13 @@ func TestRenderLogPanelKeepsFixedHeightWhenScrollable(t *testing.T) {
 		if w := lipgloss.Width(line); w != m.width {
 			t.Fatalf("panel line %d width = %d, want %d", i, w, m.width)
 		}
+	}
+}
+
+func TestRenderExecLogLineStylesStderr(t *testing.T) {
+	m := NewModel(ParseMarkdown("# A\n"), "test.md")
+	line := m.renderExecLogLine(ExecLogLine{Text: "boom", Stream: "stderr", Kind: "output"}, 20)
+	if !strings.Contains(line, "\x1b[") {
+		t.Fatalf("expected styled stderr line, got %q", line)
 	}
 }

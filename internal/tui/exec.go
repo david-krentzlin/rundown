@@ -14,7 +14,14 @@ import (
 )
 
 type execLineMsg struct {
-	line string
+	line   string
+	stream string
+}
+
+type ExecLogLine struct {
+	Text   string
+	Stream string
+	Kind   string
 }
 
 type ExecRecord struct {
@@ -25,7 +32,7 @@ type ExecRecord struct {
 	Duration time.Duration
 	Status   string
 	ExitCode int
-	Logs     []string
+	Logs     []ExecLogLine
 }
 
 type execDoneMsg struct {
@@ -67,7 +74,8 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 	m.execCancel = cancel
 	m.execStartedAt = time.Now()
 	m.execTitle = fmt.Sprintf("%s (%s)", item.Title, item.Lang)
-	m.execLogs = []string{fmt.Sprintf("$ %s %s", name, strings.Join(args, " "))}
+	cmdLine := fmt.Sprintf("$ %s %s", name, strings.Join(args, " "))
+	m.execLogs = []ExecLogLine{{Text: cmdLine, Kind: "command"}}
 	m.execStatus = "running"
 	m.execMsgCh = make(chan tea.Msg, 1024)
 	m.execRunBlockID = item.ID
@@ -78,7 +86,7 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 		Command: fmt.Sprintf("%s %s", name, strings.Join(args, " ")),
 		Started: m.execStartedAt,
 		Status:  "running",
-		Logs:    append([]string{}, m.execLogs...),
+		Logs:    append([]ExecLogLine{}, m.execLogs...),
 	}
 	m.execHistory[m.execRunBlockID] = append(m.execHistory[m.execRunBlockID], record)
 	m.execViewIndex[m.execRunBlockID] = len(m.execHistory[m.execRunBlockID]) - 1
@@ -86,8 +94,8 @@ func (m *Model) runSelectedExecutable() tea.Cmd {
 	m.execFollowTail = true
 	m.execLogScroll = 0
 
-	go streamExecPipe(stdout, m.execMsgCh)
-	go streamExecPipe(stderr, m.execMsgCh)
+	go streamExecPipe(stdout, "stdout", m.execMsgCh)
+	go streamExecPipe(stderr, "stderr", m.execMsgCh)
 	go waitExec(cmd, ctx, m.execStartedAt, m.execMsgCh)
 
 	return waitExecEvent(m.execMsgCh)
@@ -134,12 +142,12 @@ func waitExecEvent(ch chan tea.Msg) tea.Cmd {
 	}
 }
 
-func streamExecPipe(r io.Reader, out chan<- tea.Msg) {
+func streamExecPipe(r io.Reader, stream string, out chan<- tea.Msg) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 2*1024*1024)
 	for scanner.Scan() {
-		out <- execLineMsg{line: scanner.Text()}
+		out <- execLineMsg{line: scanner.Text(), stream: stream}
 	}
 }
 

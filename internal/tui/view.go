@@ -123,22 +123,23 @@ func (m *Model) renderHelpOverlay() string {
 func (m *Model) renderLogPanel(height int) string {
 	panelW := max(8, m.width)
 	bodyW := max(1, panelW-4) // border + horizontal padding
-	title, logs, status, current, total := m.execPanelData()
-	header := fmt.Sprintf("%s | status: %s", title, status)
-	if total > 0 {
-		header = fmt.Sprintf("%s | run %d/%d | status: %s", title, current, total, status)
+	rec, current, total, ok := m.execPanelData()
+	if !ok {
+		rec = ExecRecord{Title: "none", Lang: "", Status: "idle"}
 	}
-	if status == "running" {
-		header = fmt.Sprintf("%s | run %d/%d | status: running | elapsed: %s", title, current, total, time.Since(m.execStartedAt).Truncate(time.Second))
-	}
-	visible := max(1, height-3) // border top/bottom + one title row
-	maxScroll := max(0, len(logs)-visible)
+	status := rec.Status
+	titleLine := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Render(
+		clipLine(fmt.Sprintf("exec: %s (%s)", rec.Title, rec.Lang), bodyW),
+	)
+	metaLine := m.renderExecMetaLine(rec, current, total, bodyW)
+	visible := max(1, height-4) // border top/bottom + title + meta
+	maxScroll := max(0, len(rec.Logs)-visible)
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
 	start := m.execLogScroll
-	end := min(len(logs), start+visible)
+	end := min(len(rec.Logs), start+visible)
 	lines := make([]string, 0, visible)
-	for _, line := range logs[start:end] {
-		lines = append(lines, clipLine(line, bodyW))
+	for _, line := range rec.Logs[start:end] {
+		lines = append(lines, m.renderExecLogLine(line, bodyW))
 	}
 	for len(lines) < visible {
 		lines = append(lines, strings.Repeat(" ", bodyW))
@@ -154,11 +155,66 @@ func (m *Model) renderLogPanel(height int) string {
 		Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
-				clipLine(header, bodyW),
+				titleLine,
+				metaLine,
 				lipgloss.NewStyle().Width(bodyW).Height(visible).Render(content),
 			),
 		)
 	return panel
+}
+
+func (m *Model) renderExecMetaLine(rec ExecRecord, current, total, width int) string {
+	runStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	statusStyle := lipgloss.NewStyle().Foreground(execStatusAccent(rec.Status))
+
+	parts := []string{}
+	if total > 0 {
+		parts = append(parts, runStyle.Render(fmt.Sprintf("run %d/%d", current, total)))
+	}
+	if rec.Command != "" {
+		parts = append(parts, cmdStyle.Render("$ "+rec.Command))
+	}
+	if rec.Status != "" {
+		statusText := rec.Status
+		if rec.Status == "running" {
+			statusText = fmt.Sprintf("running | elapsed %s", time.Since(m.execStartedAt).Truncate(time.Second))
+		}
+		if rec.Duration > 0 && rec.Status != "running" {
+			statusText = fmt.Sprintf("%s | %s", rec.Status, rec.Duration.Truncate(time.Millisecond))
+		}
+		parts = append(parts, statusStyle.Render(statusText))
+	}
+	return clipLine(strings.Join(parts, "   "), width)
+}
+
+func (m *Model) renderExecLogLine(line ExecLogLine, width int) string {
+	text := clipLine(line.Text, width)
+	switch {
+	case line.Kind == "command":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(text)
+	case line.Kind == "result":
+		return lipgloss.NewStyle().Foreground(execStatusAccent(text)).Bold(true).Render(text)
+	case line.Stream == "stderr":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Render(text)
+	default:
+		return text
+	}
+}
+
+func execStatusAccent(status string) color.Color {
+	switch {
+	case status == "running":
+		return lipgloss.Color("221")
+	case strings.HasPrefix(status, "completed"):
+		return lipgloss.Color("42")
+	case strings.HasPrefix(status, "failed"):
+		return lipgloss.Color("196")
+	case strings.HasPrefix(status, "killed"):
+		return lipgloss.Color("208")
+	default:
+		return lipgloss.Color("244")
+	}
 }
 
 func clipLine(s string, width int) string {
@@ -210,9 +266,17 @@ func (m *Model) tailExecLogs(n int) []string {
 		return nil
 	}
 	if len(m.execLogs) <= n {
-		return m.execLogs
+		out := make([]string, 0, len(m.execLogs))
+		for _, line := range m.execLogs {
+			out = append(out, line.Text)
+		}
+		return out
 	}
-	return m.execLogs[len(m.execLogs)-n:]
+	out := make([]string, 0, n)
+	for _, line := range m.execLogs[len(m.execLogs)-n:] {
+		out = append(out, line.Text)
+	}
+	return out
 }
 
 func (m *Model) renderMarkdownPane(width, height int) string {

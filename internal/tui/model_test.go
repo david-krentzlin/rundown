@@ -316,8 +316,8 @@ func TestExecHistoryAssociatesByBlockID(t *testing.T) {
 
 	firstID := m.doc.Outline[firstExec].ID
 	secondID := m.doc.Outline[secondExec].ID
-	m.execHistory[firstID] = []ExecRecord{{Title: "first", Lang: "bash", Status: "completed (0)", Logs: []string{"first log"}}}
-	m.execHistory[secondID] = []ExecRecord{{Title: "second", Lang: "bash", Status: "failed (1)", Logs: []string{"second log"}}}
+	m.execHistory[firstID] = []ExecRecord{{Title: "first", Lang: "bash", Status: "completed (0)", Logs: []ExecLogLine{{Text: "first log", Kind: "output"}}}}
+	m.execHistory[secondID] = []ExecRecord{{Title: "second", Lang: "bash", Status: "failed (1)", Logs: []ExecLogLine{{Text: "second log", Kind: "output"}}}}
 	m.execViewIndex[firstID] = 0
 	m.execViewIndex[secondID] = 0
 
@@ -330,15 +330,18 @@ func TestExecHistoryAssociatesByBlockID(t *testing.T) {
 		t.Fatalf("expected to find outline item by id %q after reorder", secondID)
 	}
 	m.outlineIdx = selectedIdx
-	title, logs, status, current, total := m.execPanelData()
-	if !strings.Contains(title, "second") {
-		t.Fatalf("title = %q, want contains second", title)
+	rec, current, total, ok := m.execPanelData()
+	if !ok {
+		t.Fatal("expected exec panel data")
 	}
-	if len(logs) != 1 || logs[0] != "second log" {
-		t.Fatalf("logs = %v, want [second log]", logs)
+	if rec.Title != "second" {
+		t.Fatalf("title = %q, want second", rec.Title)
 	}
-	if status != "failed (1)" || current != 1 || total != 1 {
-		t.Fatalf("status/current/total = %q/%d/%d, want failed (1)/1/1", status, current, total)
+	if len(rec.Logs) != 1 || rec.Logs[0].Text != "second log" {
+		t.Fatalf("logs = %v, want [second log]", rec.Logs)
+	}
+	if rec.Status != "failed (1)" || current != 1 || total != 1 {
+		t.Fatalf("status/current/total = %q/%d/%d, want failed (1)/1/1", rec.Status, current, total)
 	}
 }
 
@@ -360,10 +363,10 @@ func TestExecScrollClampsUsingFullVisibleLogArea(t *testing.T) {
 	}
 
 	blockID := m.doc.Outline[execIdx].ID
-	visible := max(1, m.logPanelHeight()-3)
-	logs := make([]string, visible)
+	visible := max(1, m.logPanelHeight()-4)
+	logs := make([]ExecLogLine, visible)
 	for i := 0; i < visible; i++ {
-		logs[i] = fmt.Sprintf("line-%d", i)
+		logs[i] = ExecLogLine{Text: fmt.Sprintf("line-%d", i), Kind: "output"}
 	}
 	m.execHistory[blockID] = []ExecRecord{{
 		Title:  "bash block",
@@ -402,10 +405,10 @@ func TestExecLineAutoScrollsWhenFollowingTail(t *testing.T) {
 	m.execViewBlockID = blockID
 	m.execRunning = true
 	m.execFollowTail = true
-	visible := max(1, m.logPanelHeight()-3)
-	logs := make([]string, visible+3)
+	visible := max(1, m.logPanelHeight()-4)
+	logs := make([]ExecLogLine, visible+3)
 	for i := range logs {
-		logs[i] = fmt.Sprintf("line-%d", i)
+		logs[i] = ExecLogLine{Text: fmt.Sprintf("line-%d", i), Kind: "output"}
 	}
 	m.execHistory[blockID] = []ExecRecord{{
 		Title:  "bash block",
@@ -416,7 +419,7 @@ func TestExecLineAutoScrollsWhenFollowingTail(t *testing.T) {
 	m.execViewIndex[blockID] = 0
 	m.execLogScroll = 0
 
-	m.handleInternalMsg(execLineMsg{line: "next-line"})
+	m.handleInternalMsg(execLineMsg{line: "next-line", stream: "stdout"})
 	if m.execLogScroll == 0 {
 		t.Fatalf("execLogScroll = %d, want >0 after auto-follow append", m.execLogScroll)
 	}
