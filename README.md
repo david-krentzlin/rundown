@@ -59,34 +59,52 @@ Run the safe execution demo:
 ./bin/rundown examples/execution-demo.md
 ```
 
-## Keybindings
+## Keyboard shortcuts
+
+In-app help:
+
+- `?` open/close help overlay
+- `Esc` close help overlay
 
 Global:
 
 - `tab` switch focus between markdown and outline panes
-- `C-c`, `C-q`, `Q` quit
+- `Ctrl+A` jump to start of document
+- `Ctrl+E` jump to end of document
+- `Ctrl+C`, `Ctrl+Q`, `Q` quit (running commands are stopped first)
 
 Markdown pane:
 
 - `j` / `k` move down/up
-- `h` / `l` move left/up-line and right/down-line fallback navigation
-- `H` parent heading
-- `J` next heading
-- `K` previous heading
-- `L` first child heading
-- mouse wheel scroll (when cursor is over the left pane)
+- `h` / `l` fallback left/right navigation
+- `J` / `K` jump next/previous heading
+- `H` / `L` jump parent/first child heading
+- mouse wheel scroll (when pointer is over the left pane)
 
 Outline pane:
 
 - `j` / `k` move down/up
-- `c` collapse current heading
-- `C` collapse all headings
-- `e` expand current heading
-- `E` expand all headings
-- `x` toggle executable-only view
-- `n` next executable target
-- `p` previous executable target
-- `r` reserved for execution (no-op currently)
+- `c` / `C` collapse current/all headings
+- `e` / `E` expand current/all headings
+- `x` toggle executable-only outline
+- `n` / `p` jump next/previous executable target
+- `r` run selected executable target
+- `s` stop running command
+
+Execution/log panel:
+
+- `v` show/hide panel
+- `[` / `]` page previous/next run for selected executable
+- `PgUp` / `PgDn` scroll logs
+- `Ctrl+U` / `Ctrl+D` scroll logs
+- `Home` / `End` jump to top/bottom of logs
+- mouse wheel scroll (when pointer is over log panel)
+
+Log auto-follow:
+
+- While a command is running, logs follow output automatically.
+- Manual upward scrolling pauses follow mode.
+- `End` (or scrolling back to bottom) re-enables follow mode.
 
 ## Development
 

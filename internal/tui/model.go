@@ -51,6 +51,7 @@ type Model struct {
 	execViewBlockID string
 	execLogScroll   int
 	execFollowTail  bool
+	helpVisible     bool
 }
 
 func NewModel(doc Document, fileName string) *Model {
@@ -190,10 +191,21 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 }
 
 func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
+	if m.helpVisible {
+		return m.handleHelpOverlayKey(key)
+	}
+
+	if quit, cmd, handled := m.handleGlobalExecPanelKey(key); handled {
+		return quit, cmd, handled
+	}
+
 	switch key {
 	case "ctrl+c", "ctrl+q", "Q":
 		m.stopExecution()
 		return true, nil, true
+	case "?":
+		m.helpVisible = true
+		return false, nil, true
 	case "ctrl+a":
 		m.gotoDocumentTop()
 		return false, nil, true
@@ -206,6 +218,33 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 	case "v":
 		m.toggleExecPanel()
 		return false, nil, true
+	case "tab", "ctrl+i":
+		if m.focus == PaneMarkdown {
+			m.focus = PaneOutline
+		} else {
+			m.focus = PaneMarkdown
+		}
+		return false, nil, true
+	default:
+		return false, nil, false
+	}
+}
+
+func (m *Model) handleHelpOverlayKey(key string) (bool, tea.Cmd, bool) {
+	switch key {
+	case "ctrl+c", "ctrl+q", "Q":
+		m.stopExecution()
+		return true, nil, true
+	case "?", "esc":
+		m.helpVisible = false
+		return false, nil, true
+	default:
+		return false, nil, true
+	}
+}
+
+func (m *Model) handleGlobalExecPanelKey(key string) (bool, tea.Cmd, bool) {
+	switch key {
 	case "[":
 		m.execPrevRecord()
 		return false, nil, true
@@ -227,13 +266,6 @@ func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
 		m.execFollowTail = true
 		m.execLogScroll = 1 << 30
 		m.execScroll(0)
-		return false, nil, true
-	case "tab", "ctrl+i":
-		if m.focus == PaneMarkdown {
-			m.focus = PaneOutline
-		} else {
-			m.focus = PaneMarkdown
-		}
 		return false, nil, true
 	default:
 		return false, nil, false

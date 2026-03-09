@@ -13,6 +13,9 @@ func (m *Model) render() string {
 	if m.width <= 0 || m.height <= 0 {
 		return "loading..."
 	}
+	if m.helpVisible {
+		return constrainViewport(m.renderHelpOverlay(), m.width, m.height)
+	}
 
 	header := m.renderHeader()
 	main := m.renderMain()
@@ -53,13 +56,63 @@ func (m *Model) renderMain() string {
 }
 
 func (m *Model) renderFooter() string {
-	text := "tab pane | v hide/show panel | [/] prev/next run | PgUp/PgDn scroll log | outline: r run s stop"
+	text := "? help | tab pane | v hide/show panel | [/] prev/next run | PgUp/PgDn scroll log | outline: r run s stop"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("248")).
 		Background(lipgloss.Color("236")).
 		Padding(0, 1).
 		Width(m.width)
 	return style.Render(text)
+}
+
+func (m *Model) renderHelpOverlay() string {
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Render("rundown help")
+	lines := []string{
+		title,
+		"",
+		"Global",
+		"  ?        toggle this help",
+		"  tab      switch pane focus",
+		"  Ctrl+A   jump to document top",
+		"  Ctrl+E   jump to document bottom",
+		"  Ctrl+C/Q quit (stops running commands)",
+		"",
+		"Markdown pane",
+		"  j/k      move cursor down/up",
+		"  h/l      fallback left/right navigation",
+		"  J/K      next/previous heading",
+		"  H/L      parent/first child heading",
+		"  mouse    wheel scroll (left pane)",
+		"",
+		"Outline pane",
+		"  j/k      move selection",
+		"  c/C      collapse current/all headings",
+		"  e/E      expand current/all headings",
+		"  x        toggle executable-only view",
+		"  n/p      next/previous executable",
+		"  r        run selected executable",
+		"  s        stop running command",
+		"",
+		"Execution panel",
+		"  v        show/hide panel",
+		"  [/ ]     previous/next run for selected block",
+		"  PgUp/Dn  scroll logs",
+		"  Ctrl+U/D scroll logs",
+		"  Home/End jump to top/bottom logs",
+		"  mouse    wheel scroll (over log panel)",
+		"",
+		"Press ? or Esc to close help.",
+	}
+	body := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("69")).
+		Background(lipgloss.Color("236")).
+		Foreground(lipgloss.Color("252")).
+		Render(body)
 }
 
 func (m *Model) renderLogPanel(height int) string {

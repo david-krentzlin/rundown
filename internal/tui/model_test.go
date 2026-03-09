@@ -489,6 +489,28 @@ func TestCannotStartExecutionWhileAnotherRunIsActive(t *testing.T) {
 	}
 }
 
+func TestHelpOverlayToggleAndKeyCapture(t *testing.T) {
+	doc := ParseMarkdown("# A\nline\n")
+	m := NewModel(doc, "test.md")
+	m.SetViewport(80, 20)
+
+	m.handleKey("?")
+	if !m.helpVisible {
+		t.Fatal("expected help to become visible after '?'")
+	}
+
+	before := m.cursorLine
+	m.handleKey("j")
+	if m.cursorLine != before {
+		t.Fatal("expected non-help keys to be captured while help is visible")
+	}
+
+	m.handleKey("esc")
+	if m.helpVisible {
+		t.Fatal("expected help to close on esc")
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0
