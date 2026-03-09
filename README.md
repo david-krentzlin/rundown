@@ -15,6 +15,17 @@ It is built with Bubble Tea v2 and uses Lip Gloss for layout/styling.
 
 Tool version pinning is defined in [`mise.toml`](./mise.toml).
 
+## Install
+
+Install the latest release with Go:
+
+```bash
+go install github.com/david-krentzlin/rundown/cmd/rundown@latest
+```
+
+This places the `rundown` binary in your `GOBIN` (or `$(go env GOPATH)/bin`).
+Make sure that directory is on your `PATH`.
+
 ## Build
 
 ```bash
