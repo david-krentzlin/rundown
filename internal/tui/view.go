@@ -291,7 +291,8 @@ func (m *Model) renderOutlineItem(idx int, item OutlineItem) string {
 			runBadge = fmt.Sprintf(" [%d]", count)
 		}
 		summary := m.execSummary(idx)
-		line := fmt.Sprintf("%s %s %s%s%s", cursorStyle.Render(cursor), iconForLang(item.Lang), item.Title, runBadge, summary)
+		indent := m.execIndent(item)
+		line := fmt.Sprintf("%s %s%s %s%s%s", cursorStyle.Render(cursor), indent, iconForLang(item.Lang), item.Title, runBadge, summary)
 		if idx == m.outlineIdx {
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("220")).Render(line)
 		}
@@ -358,6 +359,14 @@ func (m *Model) execSummary(idx int) string {
 		return fmt.Sprintf(" {%s, %s}", last.Status, last.Duration.Truncate(time.Millisecond))
 	}
 	return fmt.Sprintf(" {%s}", last.Status)
+}
+
+func (m *Model) execIndent(item OutlineItem) string {
+	if item.Parent >= 0 && item.Parent < len(m.doc.Outline) {
+		parentLevel := m.doc.Outline[item.Parent].Level
+		return strings.Repeat("  ", max(0, parentLevel))
+	}
+	return ""
 }
 
 func fitRightPad(s string, width int) string {
