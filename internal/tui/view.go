@@ -78,9 +78,15 @@ func (m *Model) renderLogPanel(height int) string {
 	m.execLogScroll = clamp(m.execLogScroll, 0, maxScroll)
 	start := m.execLogScroll
 	end := min(len(logs), start+visible)
-	lines := append([]string{header, strings.Repeat("─", max(1, bodyW))}, logs[start:end]...)
+	lines := []string{
+		clipLine(header, bodyW),
+		strings.Repeat("─", max(1, bodyW)),
+	}
+	for _, line := range logs[start:end] {
+		lines = append(lines, clipLine(line, bodyW))
+	}
 	for len(lines) < bodyH {
-		lines = append(lines, "")
+		lines = append(lines, strings.Repeat(" ", bodyW))
 	}
 	body := lipgloss.NewStyle().
 		Width(bodyW).
@@ -95,6 +101,18 @@ func (m *Model) renderLogPanel(height int) string {
 		BorderForeground(borderColor).
 		Padding(0, 1).
 		Render(body)
+}
+
+func clipLine(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	clipped := lipgloss.NewStyle().MaxWidth(width).Render(s)
+	w := lipgloss.Width(clipped)
+	if w >= width {
+		return clipped
+	}
+	return clipped + strings.Repeat(" ", width-w)
 }
 
 func execBorderColor(status string) color.Color {
