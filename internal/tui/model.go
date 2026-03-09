@@ -170,44 +170,8 @@ func (m *Model) SetViewport(width, height int) {
 }
 
 func (m *Model) handleKey(key string) (bool, tea.Cmd) {
-	switch key {
-	case "ctrl+c", "ctrl+q", "Q":
-		return true, nil
-	case "ctrl+x":
-		m.stopExecution()
-		return false, nil
-	case "s":
-		m.stopExecution()
-		return false, nil
-	case "v":
-		m.toggleExecPanel()
-		return false, nil
-	case "[":
-		m.execPrevRecord()
-		return false, nil
-	case "]":
-		m.execNextRecord()
-		return false, nil
-	case "pgup", "ctrl+u":
-		m.execScroll(-5)
-		return false, nil
-	case "pgdown", "ctrl+d":
-		m.execScroll(5)
-		return false, nil
-	case "home":
-		m.execLogScroll = 0
-		return false, nil
-	case "end":
-		m.execLogScroll = 1 << 30
-		m.execScroll(0)
-		return false, nil
-	case "tab", "ctrl+i":
-		if m.focus == PaneMarkdown {
-			m.focus = PaneOutline
-		} else {
-			m.focus = PaneMarkdown
-		}
-		return false, nil
+	if quit, cmd, handled := m.handleGlobalKey(key); handled {
+		return quit, cmd
 	}
 
 	if m.focus == PaneMarkdown {
@@ -217,6 +181,69 @@ func (m *Model) handleKey(key string) (bool, tea.Cmd) {
 		cmd := m.handleOutlineKey(key)
 		return false, cmd
 	}
+}
+
+func (m *Model) handleGlobalKey(key string) (bool, tea.Cmd, bool) {
+	switch key {
+	case "ctrl+c", "ctrl+q", "Q":
+		return true, nil, true
+	case "ctrl+a":
+		m.gotoDocumentTop()
+		return false, nil, true
+	case "ctrl+e":
+		m.gotoDocumentBottom()
+		return false, nil, true
+	case "ctrl+x", "s":
+		m.stopExecution()
+		return false, nil, true
+	case "v":
+		m.toggleExecPanel()
+		return false, nil, true
+	case "[":
+		m.execPrevRecord()
+		return false, nil, true
+	case "]":
+		m.execNextRecord()
+		return false, nil, true
+	case "pgup", "ctrl+u":
+		m.execScroll(-5)
+		return false, nil, true
+	case "pgdown", "ctrl+d":
+		m.execScroll(5)
+		return false, nil, true
+	case "home":
+		m.execLogScroll = 0
+		return false, nil, true
+	case "end":
+		m.execLogScroll = 1 << 30
+		m.execScroll(0)
+		return false, nil, true
+	case "tab", "ctrl+i":
+		if m.focus == PaneMarkdown {
+			m.focus = PaneOutline
+		} else {
+			m.focus = PaneMarkdown
+		}
+		return false, nil, true
+	default:
+		return false, nil, false
+	}
+}
+
+func (m *Model) gotoDocumentTop() {
+	m.cursorLine = 0
+	m.mdTop = 0
+	m.syncOutlineFromMarkdown()
+}
+
+func (m *Model) gotoDocumentBottom() {
+	if len(m.doc.Lines) == 0 {
+		return
+	}
+	last := len(m.doc.Lines) - 1
+	m.cursorLine = last
+	m.mdTop = clamp(last-m.mainHeight()+1, 0, max(0, len(m.doc.Lines)-m.mainHeight()))
+	m.syncOutlineFromMarkdown()
 }
 
 func (m *Model) runExecutableAtSelection() tea.Cmd {

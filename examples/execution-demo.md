@@ -7,6 +7,10 @@ All commands are local and harmless by default.
 
 1. Open this file in rundown:
 
+### Third level heading
+
+This is what it looks like
+
 ```bash
 rundown examples/execution-demo.md
 ```

@@ -275,6 +275,23 @@ func TestNewModelSelectsFirstHeadingNotExec(t *testing.T) {
 	}
 }
 
+func TestCtrlAAndCtrlENavigateDocument(t *testing.T) {
+	doc := ParseMarkdown("# A\nline1\nline2\n## B\nline3\n")
+	m := NewModel(doc, "test.md")
+	m.SetViewport(80, 8)
+
+	m.cursorLine = 4
+	m.handleKey("ctrl+a")
+	if m.cursorLine != 0 {
+		t.Fatalf("ctrl+a cursorLine = %d, want 0", m.cursorLine)
+	}
+
+	m.handleKey("ctrl+e")
+	if want := len(doc.Lines) - 1; m.cursorLine != want {
+		t.Fatalf("ctrl+e cursorLine = %d, want %d", m.cursorLine, want)
+	}
+}
+
 func countLines(s string) int {
 	if s == "" {
 		return 0
