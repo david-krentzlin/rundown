@@ -499,6 +499,31 @@ func TestLogPanelKeysRequireLogFocus(t *testing.T) {
 	}
 }
 
+func TestLogPanelCanRerunWithRKey(t *testing.T) {
+	doc := ParseMarkdown("# A\n```bash\necho hi\n```\n")
+	m := NewModel(doc, "test.md")
+	m.execPanelVisible = true
+	m.focus = PaneLog
+	m.SetViewport(80, 24)
+
+	execIdx := -1
+	for i, item := range m.doc.Outline {
+		if item.Kind == NodeExec {
+			execIdx = i
+			break
+		}
+	}
+	if execIdx < 0 {
+		t.Fatal("expected executable block")
+	}
+	m.outlineIdx = execIdx
+
+	_, cmd := m.handleKey("r")
+	if cmd == nil {
+		t.Fatal("expected rerun command from log panel")
+	}
+}
+
 func TestQuitStopsRunningExecution(t *testing.T) {
 	doc := ParseMarkdown("# A\n")
 	m := NewModel(doc, "test.md")

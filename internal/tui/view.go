@@ -226,7 +226,7 @@ func (m *Model) renderExecTitleLine(rec ExecRecord, current, total, width int) s
 			Padding(0, 1).
 			Render(execStatusLabel(rec, m.execStartedAt)))
 	}
-	rightParts = append(rightParts, helpStyle.Render("[/] PgUp/PgDn Home/End v"))
+	rightParts = append(rightParts, helpStyle.Render("r rerun  [/] runs  PgUp/PgDn  Home/End  v"))
 	right := strings.Join(rightParts, " ")
 
 	leftW := lipgloss.Width(left)
