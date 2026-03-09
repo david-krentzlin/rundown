@@ -2,9 +2,9 @@
 
 `rundown` is a terminal UI for reading Markdown that allows you to navigate using outline and execute code blocks in the file.
 
-<img width="2348" height="1292" alt="image" src="https://github.com/user-attachments/assets/e1f3447e-1974-49fc-bdaa-c422c5e90f65" />
+<img width="3426" height="1369" alt="image" src="https://github.com/user-attachments/assets/c35ac98a-f666-47e0-bb3c-2771d94b4275" />
 
-<img width="3419" height="1308" alt="image" src="https://github.com/user-attachments/assets/14c6798e-fec4-4018-873f-78cbdef77286" />
+<img width="3417" height="1362" alt="image" src="https://github.com/user-attachments/assets/bb6f3852-0a6f-4f53-99ad-5817a60189ea" />
 
 ## Build with AI
 
