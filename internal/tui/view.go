@@ -515,18 +515,32 @@ func (m *Model) renderPaneHint(width int, active bool, text string) string {
 }
 
 func (m *Model) renderPaneHeader(width int, label string, active bool) string {
-	labelStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
-	markerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("240"))
+	barStyle := lipgloss.NewStyle().
+		Width(width).
+		Background(lipgloss.Color("237")).
+		Foreground(lipgloss.Color("245"))
+	labelStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("252")).
+		Background(lipgloss.Color("239")).
+		Padding(0, 1)
+	markerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("244"))
 	marker := "○"
 	if active {
-		labelStyle = labelStyle.Foreground(lipgloss.Color("230"))
+		barStyle = barStyle.Background(lipgloss.Color("238")).Foreground(lipgloss.Color("252"))
+		labelStyle = labelStyle.
+			Foreground(lipgloss.Color("232")).
+			Background(lipgloss.Color("117"))
 		markerStyle = markerStyle.Foreground(lipgloss.Color("117"))
 		marker = "◉"
 	}
 	left := labelStyle.Render(label)
 	right := markerStyle.Render(marker)
 	padding := max(1, width-lipgloss.Width(left)-lipgloss.Width(right))
-	return clipLine(left+strings.Repeat(" ", padding)+right, width)
+	line := left + strings.Repeat(" ", padding) + right
+	return barStyle.Render(clipLine(line, width))
 }
 
 func (m *Model) renderOutlineLines(height, width int) []string {
