@@ -185,7 +185,7 @@ func (m *Model) storeMarkdownCache(start, height, width int, lines []string) {
 
 func (m *Model) markdownFallbackLines(start, height, width int) []string {
 	lines := make([]string, 0, height)
-	state := concealState{}
+	state := concealStateAt(m.doc.Lines, start)
 	for row := 0; row < height; row++ {
 		lineIdx := start + row
 		if lineIdx >= len(m.doc.Lines) {

@@ -11,6 +11,21 @@ type concealState struct {
 	inFence bool
 }
 
+func concealStateAt(lines []string, start int) concealState {
+	st := concealState{}
+	if start <= 0 {
+		return st
+	}
+	limit := min(start, len(lines))
+	for i := 0; i < limit; i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(trimmed, "```") {
+			st.inFence = !st.inFence
+		}
+	}
+	return st
+}
+
 func concealMarkdownLine(line string, st *concealState) string {
 	trimmed := strings.TrimSpace(line)
 	if strings.HasPrefix(trimmed, "```") {
