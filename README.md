@@ -7,6 +7,11 @@ It is built with Bubble Tea v2 and uses Lip Gloss for layout/styling.
 
 <img width="2351" height="1289" alt="image" src="https://github.com/user-attachments/assets/a2ea6e3b-cf98-4702-863e-255e7f781e7a" />
 
+## Build with AI
+
+This tool has been built using agentic coding.  I wanted to validate the approach first.
+The quality of the code is subpar as a result of that. However as far as I can tell this does not
+inhibit functionality. I will polish this in the future.
 
 ## Requirements
 
