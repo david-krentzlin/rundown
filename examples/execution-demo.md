@@ -29,6 +29,20 @@ echo "current shell: $SHELL"
 echo "date: $(date '+%Y-%m-%d %H:%M:%S')"
 ```
 
+## Bash: Shared Session State
+
+These two blocks opt into a shared shell session explicitly with
+`session=true`. Without that annotation, shell variables are not shared.
+
+```bash session=true
+export RUNDOWN_DEMO_NAME="rundown session"
+echo "set RUNDOWN_DEMO_NAME=$RUNDOWN_DEMO_NAME"
+```
+
+```bash session=true
+echo "RUNDOWN_DEMO_NAME is still: $RUNDOWN_DEMO_NAME"
+```
+
 ## Ruby: Simple Output
 
 ```ruby
